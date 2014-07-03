@@ -43,7 +43,7 @@ int main( int argc, char* argv[] ) {
 	Window* win = new Window( 800, 480, "Widget Demo", (argc > 1) );
 	win->texture( 0 );
 
-	Container* foo = new Container( 400,300, 0, 0, M_PI*20/180, 0, 0xFF );
+	Container* foo = new Container( 400,300, 0, 0, M_PI*20/180, 0, 0x0 );
 	win->add( foo );
 
 	foo->add( new Label( "Container", 200,20, 0,120, 0,1 ) );

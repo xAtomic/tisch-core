@@ -13,8 +13,9 @@
 	#include <unistd.h>
 	
 	#ifndef __ANDROID__
-		#include <SmartPtr.h>
-		#include <SharedMem.h>
+		#include <sys/ipc.h>
+		#include <sys/shm.h>
+		#include <sys/sem.h>
 		#include <sys/mman.h>
 	#endif
 
@@ -33,12 +34,14 @@
 	#include <sys/mman.h>
 	#include <sys/types.h>
 
+#elif _MSC_VER
+
+	#define key_t int
+
 #endif
 
 #include <stdexcept>
 #include <iostream>
-#include <fstream>
-#include <string>
 
 #include <stdint.h>
 #include <string.h>
@@ -62,16 +65,36 @@ class TISCH_SHARED Image {
 
 		// destructor to clean the freestore/IPC mess
 		virtual ~Image() {
+
 			if (key == 0) {
+				
 				// no key given, so simply delete the image
 				delete[] rawdata;
-			} else if (shm == NULL) {
+				// delete[] data; // this is missing I think??
+			}
+			
+			#if !defined(_MSC_VER) && !defined(__ANDROID__)
+
+			else if (shm == 0) {
+
 				// we used mmap, so detach again
 				munmap( data, size );
+
 			} else {
-				// delete the shared memory wrapper
-				// delete shm; - will be done by SmartPtr
+
+				struct shmid_ds shmstat;
+				
+				// first, detach the shared memory segment
+				shmdt( (void*) data );
+				
+				// we created the IPC handles, so we have to clean up
+				if (flags | IPC_CREAT) {
+				  shmctl( shm, IPC_RMID, &shmstat );
+				  semctl( sem, 0, IPC_RMID );
+				}
 			}
+
+			#endif
 		}
 
 		Image& operator= ( const Image& img ) {
@@ -83,8 +106,8 @@ class TISCH_SHARED Image {
 
 		void swapData( Image& img ) {
 			if (size != img.size) throw std::runtime_error( "Image: raw size mismatch in buffer swap" );
-			uint8_t* tmp = img.data; img.data = data; data = tmp;
-			tmp = img.rawdata; img.rawdata = rawdata; rawdata = tmp;
+			/*uint8_t* tmp = img.data;*/ img.data = data; //data = tmp;
+			/*tmp = img.rawdata;*/ img.rawdata = rawdata; //rawdata = tmp;
 		}
 
 		inline unsigned char* getData() const { return data; }
@@ -101,9 +124,13 @@ class TISCH_SHARED Image {
 		inline void timestamp( unsigned long long int val ) { imgtime = val; }
 		inline unsigned long long int timestamp() { return imgtime; }
 
-		void acquire() { if (shm) shm->acquire(); }
-		void release() { if (shm) shm->release(); }
+		#if !defined(_MSC_VER) && !defined(__ANDROID__)
 
+		inline int acquire() { return do_sem( -1 ); }
+		inline int release() { return do_sem( +1 ); }
+
+		#endif
+		
 	protected:
 
 		// this one should never be used
@@ -126,79 +153,69 @@ class TISCH_SHARED Image {
 			count   = width*height;
 			size    = (int)(count*_bpp);
 
-			shm = NULL;
-			key = _key;
-			rawdata = NULL;
+			key    = _key;
+			flags  = (int)_flags;
+
+			shm = sem = 0;
 
 			if (key == 0) {
+
 				// no key given, so we don't use shared memory or mmap, only the freestore (32-byte-aligned for MMX/SSE)
 				rawdata = data = new unsigned char[size+64];
 				data = (unsigned char*)((unsigned long long)(rawdata+32) & (unsigned long long int)(0xFFFFFFFFFFFFFFE0ULL));
 				// uncomment for debugging to make valgrind happy (doesn't know mmap)
 				// for (int i = 0; i < size; i++) rawdata[i] = 0;
+
 			}
 
-			#ifdef __linux
+			#if defined(_MSC_VER) || defined(__ANDROID__)
+
+				else throw std::runtime_error( "Shared memory is currently unsupported on Android & Windows." );
+
+			#else
+
 			else if (fcntl( key, F_GETFL ) != -1) {
+
+				#ifndef __APPLE__
 				// key is a file descriptor, so use mmap with flags == struct v4l2_buffer* giving offset & size
 				struct v4l2_buffer* tmpbuf = (struct v4l2_buffer*)_flags;
 				data = (unsigned char*) mmap( NULL, tmpbuf->length, PROT_READ | PROT_WRITE, MAP_SHARED, key, tmpbuf->m.offset );
 				if (data == MAP_FAILED) throw std::runtime_error( std::string("mmap: ").append(strerror(errno)) );
-			} 
-			#endif
+				#endif
 
-			else {
-				// create new shared memory wrapper
-				shm = new SharedMem( key, size, (_flags==1) );
-				// attach segment 
-				data = shm->get();
+			} else {
+				
+				// flag setting '1' doesn't make sense, replace with default values
+			 	if (flags	== 1) flags = (IPC_CREAT | 0666);
+
+				// only one of the images should use IPC_CREAT, so add IPC_EXCL that all other tries fail
+				if (flags | IPC_CREAT) flags |= IPC_EXCL;
+
+				// key is a IPC id, so create/retrieve segment and semaphore handles
+				shm = shmget( key, size, flags );
+				sem = semget( key,    1, flags );
+
+				// attach segment and check for errors
+				data = (unsigned char*) shmat( shm, 0, 0 );
+				if (data == (void*)-1) throw std::runtime_error( std::string("shmat: ") + std::string(strerror(errno)) );
+				
+				// set semaphore value to 1 if it was newly created
+				if (flags | IPC_CREAT) semctl( sem, 0, SETVAL, 1 );
 			}
+
+			#endif
 		}
 
-		void load( const char* path, const char* type, int maxbpp ) {
+		#if !defined(_MSC_VER) && !defined(__ANDROID__)
 
-			int fwidth,fheight,fvalues;
-			std::string magic,tmp;
-
-			// open file with whitespace skipping
-			std::ifstream myfile( path, std::ios::in );
-			myfile >> std::skipws;
-
-			// parse the header
-			myfile >> magic;   myfile.ignore(1); if (myfile.peek() == '#') getline( myfile, tmp );
-			myfile >> fwidth;  myfile.ignore(1); if (myfile.peek() == '#') getline( myfile, tmp );
-			myfile >> fheight; myfile.ignore(1); if (myfile.peek() == '#') getline( myfile, tmp );
-			myfile >> fvalues;
-
-			if ((magic != type) || (fvalues >= (1<<(8*maxbpp))) || (fvalues < 1)) 
-				throw std::runtime_error( std::string("Image::load( ") + std::string(path) + std::string(" ): no valid PGM file") );
-
-			// init the base class
-			init( fwidth, fheight, maxbpp, 0, 0 );
-
-			// skip one byte, read the rest
-			myfile.ignore( 1 );
-			myfile.read( (char*)data, size );
-			myfile.close( );
+		// wrapper for semaphore access
+		inline int do_sem( short int val ) {
+			struct sembuf sem_op = { 0, val, 0 };
+			return semop( sem, &sem_op, 1 );
 		}
 
-		void save( const char* filename, const char* magic ) {
-
-			std::ofstream imagefile( filename, std::ios::out );
-
-			// file header 
-			imagefile << magic << "\n";
-			imagefile << "# CREATOR: libTISCH version 3.0\n";
-			imagefile << width << " " << height << " ";
-			imagefile << ((1<<(8*bpp))-1) << "\n"; // values per pixel
-
-			// file content
-			imagefile.write( (char*)data, size );
-
-			// be polite and tidy up ;)
-			imagefile.close();
-		}
-
+		#endif
+		
 		// image parameters
 		int width, height, bpp, size, count;
 		unsigned long long int imgtime;
@@ -208,8 +225,8 @@ class TISCH_SHARED Image {
 		unsigned char* data;
 
 		// shared image support
-		SmartPtr<SharedMem> shm;
-		int key;
+		int shm, sem, flags;
+		key_t key;
 
 };
 

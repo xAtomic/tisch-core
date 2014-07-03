@@ -47,6 +47,7 @@ struct CalibTUIOInput: public TUIOInStream {
 	virtual void process_blob( BasicBlob& blob ) {
 		if (rawlog) (*rawlog) << blob << std::endl;
 		cal.apply( blob );
+		if (rawlog) (*rawlog) << blob << std::endl;
 		*output << blob;
 	}
 

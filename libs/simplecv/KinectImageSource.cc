@@ -17,6 +17,10 @@
 #include <sys/time.h>
 #endif
 
+#ifdef _MSC_VER
+#include "usb.h"
+#endif
+
 #include <errno.h>  // errno
 
 #include <cstdio>
@@ -27,6 +31,12 @@
 
 
 KinectImageSource::KinectImageSource( int debug ) {
+
+	#ifdef _MSC_VER
+		usb_init();
+	#else
+		libusb_init( NULL );
+	#endif
 
 	// open the device
 	if (freenect_init( &f_ctx, NULL ) < 0)
@@ -45,18 +55,12 @@ KinectImageSource::KinectImageSource( int debug ) {
 	curvb  =   0;
 
 	fps    =  30;
-	run    =   0;
+	run    =   1;
 
 	depthbuf[0] = new ShortImage( width, height );
 	depthbuf[1] = new ShortImage( width, height );
 	videobuf[0] = new RGBImage( width, height );
 	videobuf[1] = new RGBImage( width, height );
-
-	freenect_frame_mode dmode = freenect_find_depth_mode( FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_REGISTERED );
-	freenect_frame_mode vmode = freenect_find_video_mode( FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB        );
-
-	freenect_set_depth_mode( f_dev, dmode ); // assert(dmode.bytes == src->depthbuf[0]->size())
-	freenect_set_video_mode( f_dev, vmode ); // assert(vmode.bytes == src->videobuf[0]->size())
 
 	freenect_set_user( f_dev, this );
 }
@@ -77,8 +81,7 @@ void depth_cb( freenect_device* dev, void* depth, uint32_t timestamp ) {
 	pthread_mutex_lock( &(src->kinect_lock) );
 	src->curdb = (src->curdb+1)%2;
 	freenect_set_depth_buffer( dev, src->depthbuf[src->curdb]->getData() );
-	// FIXME hack: always keep depth buffer synchronous with color buffer
-	// pthread_cond_signal( &(src->kinect_cond) );
+	pthread_cond_signal( &(src->kinect_cond) );
 	pthread_mutex_unlock( &(src->kinect_lock) );
 }
 
@@ -96,6 +99,12 @@ void* kinecthandler( void* arg ) {
 
 	freenect_set_depth_callback( src->f_dev, depth_cb );
 	freenect_set_video_callback( src->f_dev, rgb_cb );
+
+	freenect_frame_mode dmode = freenect_find_depth_mode( FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_REGISTERED );
+	freenect_frame_mode vmode = freenect_find_video_mode( FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB        );
+
+	freenect_set_depth_mode( src->f_dev, dmode ); // assert(dmode.bytes == src->depthbuf[0]->size())
+	freenect_set_video_mode( src->f_dev, vmode ); // assert(vmode.bytes == src->videobuf[0]->size())
 
 	freenect_set_depth_buffer( src->f_dev, src->depthbuf[src->curdb]->getData() );
 	freenect_set_video_buffer( src->f_dev, src->videobuf[src->curvb]->getData() );
@@ -116,7 +125,6 @@ void* kinecthandler( void* arg ) {
 
 
 void KinectImageSource::start() {
-	run = 1;
 	int res = pthread_create( &kinect_thread, NULL, kinecthandler, this );
 	if (res != 0) throw std::runtime_error( "error in pthread_create." );
 }
@@ -148,13 +156,13 @@ void KinectImageSource::getImage( IntensityImage& target ) const {
 }
 
 void KinectImageSource::getImage( ShortImage& target ) const {
+	//depthbuf[(curdb+1)%2]->swapData(target);
 	uint16_t* source = (uint16_t*)depthbuf[(curdb+1)%2]->getData();
 	uint16_t* targ = (uint16_t*)target.getData();
 	for (int i = 0; i < width*height; i++) {
 		// the depth data is in mm, from 0 to ~8000 = 13 bits
 		targ[i] = (8191 - source[i]) << 3;
 	}
-	//depthbuf[(curdb+1)%2]->swapData(target);
 }
 
 void KinectImageSource::getImage( RGBImage& target ) const {

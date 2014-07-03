@@ -180,7 +180,7 @@ struct CalibTUIOInput: public TUIOInStream {
 
 	virtual void process_blob( BasicBlob& b ) {
 		if (!delay && (b.type == ttype))
-			blobs[b.id].push_back(b.peak);
+			blobs[b.id].push_back(b.pos); //andi (was b.peak)
 	}
 
 };

@@ -30,7 +30,30 @@ void RGBImage::getChannel(int channel, IntensityImage& target) const {
 }
 
 RGBImage::RGBImage( const char* path ) {
-	Image::load( path, "P6", 3 );
+
+	int fwidth,fheight,fbpp;
+	std::string magic;
+
+	// open file with whitespace skipping
+	std::ifstream myfile( path, std::ios::in );
+	myfile >> std::skipws;
+
+	// parse the header
+	myfile >> magic;
+	myfile >> fwidth;
+	myfile >> fheight;
+	myfile >> fbpp;
+
+	if ((magic != "P6") || (fbpp > 255) || (fbpp < 1)) 
+		throw std::runtime_error( std::string("RGBImage: ") + std::string(path) + std::string(": no valid PPM file") );
+
+	// init the base class
+	init( fwidth, fheight, 3, 0, 0 );
+
+	// skip one byte, read the rest
+	myfile.ignore( 1 );
+	myfile.read( (char*)data, size );
+	myfile.close( );
 }
 
 
@@ -40,53 +63,43 @@ void RGBImage::getIntensity(IntensityImage& target) const {
 	}
 }
 
-void rgb2hsv( int r, int g, int b, unsigned char &h, unsigned char &s, unsigned char &v ) {
-
-	int max,min,c;
-
-	max = (r > g ? r : g); max = (max > b ? max : b);
-	min = (r < g ? r : g); min = (min < b ? min : b);
-
-	c = max - min;
-	v = max;
-
-	if (c == 0) {
-		h = 0;
-		s = 0;
-	} else {
-		s = 255*(int)c/v;
-		if (r == max) {
-			h = 0 + 43*(g - b)/c;
-		} else if (g == max) {
-			h = 85 + 43*(b - r)/c;
-		} else { // b == max
-			h = 171 + 43*(r - g)/c;
-		}
-	}
-}
-	
-
 void RGBImage::getHSV( IntensityImage& hue, IntensityImage& sat, IntensityImage& val ) const {
-	unsigned char r,g,b,h,s,v;
-	int target_offs = 0;
+	unsigned char r,g,b,max,min,h,s,v,c;
+	int target_offs;
 	for (int offset = 0; offset < size; offset+=3) {
 
 		r = data[offset + TR];
 		g = data[offset + TG];
 		b = data[offset + TB];
 
-		rgb2hsv(r,g,b,h,s,v);
+		max = (r > g ? r : g); max = (max > b ? max : b);
+		min = (r < g ? r : g); min = (min < b ? min : b);
 
+		c = max - min;
+		v = max;
+
+		if (c == 0) {
+			h = 0;
+			s = 0;
+		} else {
+			s = 255*(int)c/v;
+			if (r == max) {
+				h = 0 + 43*(g - b)/c;
+			} else if (g == max) {
+				h = 85 + 43*(b - r)/c;
+			} else { // b == max
+				h = 171 + 43*(r - g)/c;
+			}
+		}
+
+		target_offs = offset/3;
 		hue.data[target_offs] = h;
 		sat.data[target_offs] = s;
 		val.data[target_offs] = v;
-		target_offs++;
 	}
 }
 
-void RGBImage::combine(const IntensityImage& hue, const IntensityImage& sat, const IntensityImage& val) {
-
-	/* original (unused) code for combining RGB
+void RGBImage::combine(const IntensityImage& red, const IntensityImage& green, const IntensityImage& blue) {
 	int chanoffset,rgboffset;
 	for (int x = 0; x < width; x++) for (int y = 0; y < height; y++) {
 		chanoffset = red.pixelOffset(x,y);
@@ -94,41 +107,6 @@ void RGBImage::combine(const IntensityImage& hue, const IntensityImage& sat, con
 		data[rgboffset + TR]	=   red.data[chanoffset];
 		data[rgboffset + TG]	= green.data[chanoffset];
 		data[rgboffset + TB]	=  blue.data[chanoffset];
-	}*/
-
-	unsigned char r,g,b,area,rest,p,q,t,h,s,v;
-	int target_offset = 0;
-
-	for (int offset = 0; offset < count; offset++) {
-
-		h = hue.data[offset];
-		s = sat.data[offset];
-		v = val.data[offset];
-
-		if (s == 0) {
-			r = v;
-			g = v;
-			b = v;
-		} else {
-			area =  h / 43;
-			rest = (h % 43)*6;
-			p = ((int)v * ( 255 - s )) >> 8;
-			q = ((int)v * ( 255 - ((s * rest) >> 8))) >> 8;
-			t = ((int)v * ( 255 - ((s * (255-rest)) >> 8))) >> 8;
-			switch (area) {
-				case 0:  r = v; g = t; b = p; break;
-				case 1:  r = q; g = v; b = p; break;
-				case 2:  r = p; g = v; b = t; break;
-				case 3:  r = p; g = q; b = v; break;
-				case 4:  r = t; g = p; b = v; break;
-				default: r = v; g = p; b = q; break;
-			}
-		}
-
-		data[target_offset+TR] = r;
-		data[target_offset+TG] = g;
-		data[target_offset+TB] = b;
-		target_offset+=3;
 	}
 }
 

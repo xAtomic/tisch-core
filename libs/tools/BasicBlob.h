@@ -84,8 +84,6 @@ class TISCH_SHARED BasicBlob {
 			int markerID;
 		} assignedMarker;
 
-		unsigned char h,s,v;
-
 };
 
 #endif // _BASICBLOB_H_

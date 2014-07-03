@@ -15,16 +15,13 @@ class TISCH_SHARED ShortImage: public Image {
 
 	public:
 
-		ShortImage( int w, int h, key_t key = 0, unsigned long long int flags = 0 );
-		ShortImage( const char* path );
-	
+		ShortImage( int w, int h );
+
 		ShortImage( const ShortImage&     img );
 		ShortImage( const IntensityImage& img );
 
 		ShortImage& operator= ( const ShortImage&     img );
 		ShortImage& operator= ( const IntensityImage& img );
-
-		void save( const char* path );
 
 		void update( const IntensityImage& img, const IntensityImage& mask );
 		void update( const ShortImage& img, const ShortImage& mask );
@@ -40,7 +37,7 @@ class TISCH_SHARED ShortImage: public Image {
 
 		 unsigned short* getSData() const { return sdata; }
 
-		 int  threshold( unsigned short value, ShortImage& target , unsigned short minvalue = 65535 ) const;
+		 int  threshold( unsigned short value, ShortImage& target , unsigned short minvalue = 65535, int forward_values = 0 ) const;
 		 void despeckle( ShortImage& target, unsigned char threshold = 8 ) const;
 		 void lowpass( ShortImage& target, unsigned char range = 1, unsigned char mode = 0 ) const;
 		 void areamask( ShortImage& target, std::vector<int> edgepoints) const;

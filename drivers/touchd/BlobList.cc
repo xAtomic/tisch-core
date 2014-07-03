@@ -14,50 +14,53 @@ int gid = 0;
 
 
 // create new BlobList from a {0,255}-image
-BlobList::BlobList( TiXmlElement* _config, Filter* _input ):
-	Filter( _config, _input, FILTER_TYPE_NONE )
-{
+BlobList::BlobList( TiXmlElement* _config, Filter* _input ): Filter( _config, _input ) {
 
 	blobs = oldblobs = NULL;
 	reset();
 
+	checkImage();
 	parent = 0;
 
-	if (input->getImage()) {
-		width  = input->getImage()->getWidth();
-		height = input->getImage()->getHeight();
-	} else {
-		width  = input->getShortImage()->getWidth();
-		height = input->getShortImage()->getHeight();
-	}
+	width  = image->getWidth();
+	height = image->getHeight();
 
-	image = new IntensityImage( width, height );
-	shortimage = NULL;
+	type  = 0;
+	hflip = 0;
+	vflip = 0;
 
-	if (input->getRGBImage())
-		rgbimage = new RGBImage(
-			input->getRGBImage()->getWidth(),
-			input->getRGBImage()->getHeight()
-		);
+	minsize = 50;
+	maxsize = 0;
+
+	factor = 1.5;
+	radius = 20;
+	peakmode = 0.0;
+	ignore_orphans = 0;
 
 	// try to read settings from XML
-	createOption( "Type",  0, 0, 32 );
-	createOption( "HFlip", 0, 0,  1 );
-	createOption( "VFlip", 0, 0,  1 );
-	createOption( "IgnoreOrphans", 0, 0, 1 );
+	config->QueryIntAttribute( "Type",  &type  );
+	config->QueryIntAttribute( "HFlip", &hflip );
+	config->QueryIntAttribute( "VFlip", &vflip );
+	config->QueryIntAttribute( "IgnoreOrphans", &ignore_orphans );
 
-	createOption( "MinSize", 50, 1 );
-	createOption( "MaxSize",  0, 0 );
+	config->QueryIntAttribute( "MinSize",  &minsize  );
+	config->QueryIntAttribute( "MaxSize",  &maxsize  );
 
-	createOption( "TrackRadius",  20,  1 );
-	createOption( "PeakFactor",  1.5,  1 );
-	createOption( "PeakMode",    0.0, -1 );
+	config->QueryDoubleAttribute( "TrackRadius", &radius   );
+	config->QueryDoubleAttribute( "PeakFactor",  &factor   );
+	config->QueryDoubleAttribute( "PeakMode",    &peakmode );
+	//config->QueryIntAttribute( "CrossColor", &cross);
+	//config->QueryIntAttribute( "TrailColor", &trail);
 
+#ifdef HAS_FREENECT
 	// MarkerTracker
-	createOption( "MarkerTracker", 0, 0, 1 );
-	createOption( "MTshowMarker",  0, 0, 1 );
+	config->QueryIntAttribute( "MarkerTracker", &int_mt_enabled );
+	config->QueryIntAttribute( "MTshowMarker", &int_mt_showMarker );
 
-#ifdef HAS_UBITRACK
+	// check values for value range and set default values
+	(int_mt_enabled == 1)		? mt_enabled = true		: mt_enabled = false;
+	(int_mt_showMarker == 1)	? mt_showMarker = true	: mt_showMarker = false;
+
 	// create MarkerTracker with read settings
 	mMarkerTracker = new MarkerTracker(width, height);
 	mMarkerTracker->addMarkerID(0x1228);
@@ -68,16 +71,19 @@ BlobList::BlobList( TiXmlElement* _config, Filter* _input ):
 	mMarkerTracker->addMarkerID(0x0272);
 
 	detectedMarkers = new std::vector<Ubitrack::Vision::SimpleMarkerInfo>;
+
+	// setting variables for Configurator
+	countOfOptions = 7; // quantity of variables that can be manipulated
+#else
+	countOfOptions = 5; // quantity of variables that can be manipulated
 #endif
 }
 
 BlobList::~BlobList() {
 	delete blobs;
 	delete oldblobs;
-	#ifdef HAS_UBITRACK
 	delete mMarkerTracker;
 	delete detectedMarkers;
-	#endif
 }
 
 void BlobList::reset() {
@@ -94,41 +100,31 @@ void BlobList::link( Filter* _link ) {
 
 int BlobList::process() {
 
-	// tracking & peak settings
-	double radius = options["TrackRadius"]->get();
-	double factor = options["PeakFactor"]->get();
-	double peakmode = options["PeakMode"]->get();
-
-	// blob detection settings
-	int minsize = options["MinSize"]->get();
-	int maxsize = options["MaxSize"]->get();
-
-	int ignore_orphans = options["IgnoreOrphans"]->get();
-	blobtype = options["Type"]->get();
-
 	// swap blob lists
 	delete oldblobs;
 	oldblobs = blobs;
 	blobs = new std::vector<Blob>;
 
 	// clone the input image
-	if (input->getImage()) {
-		*image = *(input->getImage());
-	} else {
-		input->getShortImage()->convert(*image);
+	*image = *(input->getImage());
+	if(!useIntensityImage) 
+	{
+		*shortimage = *(input->getShortImage());
+		shortimage->convert(*image);
 
-#ifdef HAS_UBITRACK
-		if( options["MarkerTracker"]->get() != 0) {
+#ifdef HAS_FREENECT
+		rgbimage = input->getRGBImage(); // get pointer from previous filter, do nothing
+
+		if( mt_enabled ) {
 			// call MarkerTracker here
 			mMarkerTracker->findMarker(rgbimage, image, detectedMarkers);
+			
 		}
 #endif
 	}
 
 	// frame-local blob counter to differentiate between blobs
 	unsigned char value = 254;
-
-	RGBImage* rgb = input->getRGBImage();
 
 	// scan for bright spots
 	unsigned char* data = image->getData();
@@ -144,33 +140,7 @@ int BlobList::process() {
 		// did the frame-local blob counter overflow?
 		if (value == 0) {
 			value = 254;
-			std::cerr << "Warning: too many type " << blobtype << " blobs!" << std::endl;
-		}
-
-		if (rgb) {
-			Blob& blob = blobs->back();
-			std::vector<Point>& border = blob.border;
-			std::vector<Point>::iterator pt = border.begin();
-			rgbimage->clear();
-			unsigned long long int r = 0,g = 0,b = 0,count = 0;
-			while (pt != border.end()) {
-				Point p1 = *pt; pt++;
-				Point p2 = *pt; pt++;
-				int offset = rgbimage->pixelOffset(p1.x,p1.y,TR);
-				int target = rgbimage->pixelOffset(p2.x,p2.y,TB);
-				unsigned char* src = rgb->getData();
-				unsigned char* dst = rgbimage->getData();
-				while (offset <= target) {
-					dst[offset] = src[offset]; r += src[offset++];
-					dst[offset] = src[offset]; g += src[offset++];
-					dst[offset] = src[offset]; b += src[offset++];
-					count++;
-				}
-			}
-			r = r/count;
-			g = g/count;
-			b = b/count;
-			rgb2hsv(r,g,b,blob.h,blob.s,blob.v);
+			std::cerr << "Warning: too many type " << type << " blobs!" << std::endl;
 		}
 
 	} catch (...) { }
@@ -214,7 +184,7 @@ int BlobList::process() {
 		blob->setPeak( image, factor, peakmode );
 	}
 
-	#ifdef HAS_UBITRACK
+
 	// also try to find a blob for each marker; if no blob is found, a blob is created for the marker position
 	for(std::vector<Ubitrack::Vision::SimpleMarkerInfo>::iterator marker_iter = detectedMarkers->begin();
 		marker_iter != detectedMarkers->end(); marker_iter++)
@@ -249,6 +219,8 @@ int BlobList::process() {
 		// move origin to top left corner (+1.4), map to image coords (*171)
 		double my = (((marker_y / marker_z) / 45 * 240) + 1.4) * 171;
 
+		//std::cout << "Marker Pos: " << mx << " " << my << std::endl;
+		//std::cout << "blobs " << blobs->size() << std::endl;
 		for ( std::vector<Blob>::iterator blob = blobs->begin(); blob != blobs->end(); blob++ ) {
 
 			double blob_x = blob->pos.x;
@@ -256,12 +228,12 @@ int BlobList::process() {
 
 			//std::cout << "mx " << marker_x << " my " << marker_y << " mz " << marker_z << " calX " << mx << " calY " << my << std::endl;
 		
-			//std::cout << "blobX " << mx << " blobY " << my << std::endl;
+			//std::cout << "blobX " << blob_x << " blobY " << blob_y << std::endl;
 
 			// Thresholds for assign blob <> marker
 			// todo: make them changeable via configurator
-			double xThresh = 30.0;
-			double yThresh = 30.0;
+			double xThresh = 100.0;
+			double yThresh = 100.0;
 
 			if(abs(blob_x - mx) < xThresh && abs(blob_y - my) < yThresh) {
 				blob->assignedMarker.markerID = marker_iter->ID;
@@ -269,27 +241,25 @@ int BlobList::process() {
 				break;
 			}
 		}
-		if(!blob_found)
+		/*if(!blob_found)
 		{
 			Blob markerblob(value, gid);
 			value--; gid++;
 
 			if (value == 0) {
 				value = 254;
-				std::cerr << "Warning: too many type " << blobtype << " blobs!" << std::endl;
+				std::cerr << "Warning: too many type " << type << " blobs!" << std::endl;
 			}
-
+			markerblob.tracked = 1;
 			markerblob.pos.x = mx; markerblob.pos.y = my;
 			markerblob.peak.x = mx;	markerblob.peak.y = my;
 			markerblob.size = 2000;
 			markerblob.type = INPUT_TYPE_FINGER;
 			markerblob.assignedMarker.markerID = marker_iter->ID;
 			blobs->push_back(markerblob);
-		}
+		}*/
 
 	}
-	#endif
-
 	// ---------------------------------------------------------------------------
 	// TODO: allow disabling this feature (even if parent set)
 	// find parent IDs from another list (if available)
@@ -316,12 +286,17 @@ int BlobList::getID( unsigned char value ) {
 
 
 // draw the entire list to a window, taking care to minimize GL state switches
-void BlobList::draw( GLUTWindow* win, int show_image ) {
-
-		Filter::draw( win, show_image );
-
-		double xoff,yoff,height;
+void BlobList::draw( GLUTWindow* win ) {
+#ifdef HAS_FREENECT
+	if( displayRGBImage ) {
+		win->show( *rgbimage, 0, 0 );
+	}
+	else {
+#endif //HAS_FREENECT
+		double xoff,yoff,height,size;
 		height = win->getHeight();
+
+		win->show( *image, 0, 0 );
 
 		glTranslatef(0,0,500); // FIXME: compensate video image default z offset
 		glLineWidth(2.0);
@@ -351,7 +326,7 @@ void BlobList::draw( GLUTWindow* win, int show_image ) {
 			
 			xoff = blob->pos.x;
 			yoff = height - blob->pos.y;
-			//size = sqrt((double)blob->size)/factor;
+			size = sqrt((double)blob->size)/factor;
 
 			glVertex2d( xoff - blob->axis1.x, yoff + blob->axis1.y );
 			glVertex2d( xoff + blob->axis1.x, yoff - blob->axis1.y );
@@ -373,11 +348,9 @@ void BlobList::draw( GLUTWindow* win, int show_image ) {
 			tmp << blob->id; if (blob->pid) tmp << "." << blob->pid;
 			win->print( tmp.str(), (int)blob->peak.x, (int)blob->peak.y );
 		}
-#ifdef HAS_UBITRACK
+#ifdef HAS_FREENECT
+	}
 	
-	bool mt_enabled = options["MarkerTracker"].get();
-	bool mt_showMarker = options["MTShowMarker"].get();
-
 	if( mt_enabled ) {
 		glColor4f( 1.0, 0.0, 0.0, 1.0 );
 		win->print( std::string("makertracker running"), 10, win->getHeight() - 30 );
@@ -436,14 +409,10 @@ void BlobList::draw( GLUTWindow* win, int show_image ) {
 // send blob list via OSC as TUIO 2.0
 void BlobList::send( TUIOOutStream* oscOut ) {
 
-	int hflip = options["HFlip"]->get();
-	int vflip = options["VFlip"]->get();
-
 	for (std::vector<Blob>::iterator it = blobs->begin(); it != blobs->end(); it++) {
 
 		BasicBlob tmp = *it;
-		tmp.type = blobtype;
-		tmp.h = it->h; // FIXME: are these assignments needed at all?
+		tmp.type = type;
 
 		tmp.pos.x  = tmp.pos.x  / (double)width; tmp.pos.y  = tmp.pos.y  / (double)height;
 		tmp.peak.x = tmp.peak.x / (double)width; tmp.peak.y = tmp.peak.y / (double)height;
@@ -460,4 +429,163 @@ void BlobList::send( TUIOOutStream* oscOut ) {
 		
 		*oscOut << tmp;
 	}
+}
+
+const char* BlobList::getOptionName(int option) {
+	const char* OptionName = "";
+
+	switch(option) {
+	case 0:
+		OptionName = "Horizontal Flip";
+		break;
+	case 1:
+		OptionName = "Vertical Flip";
+		break;
+	case 2:
+		OptionName = "Minimum Size";
+		break;
+	case 3:
+		OptionName = "Maximum Size";
+		break;
+	case 4:
+		OptionName = "Peakmode";
+		break;
+#ifdef HAS_FREENECT
+	// MarkerTracker
+	case 5:
+		OptionName = "MT enabled";
+		break;
+	case 6:
+		OptionName = "MT show marker";
+		break;
+#endif
+	default:
+		// leave OptionName empty
+		break;
+	}
+
+	return OptionName;
+}
+
+double BlobList::getOptionValue(int option) {
+	double OptionValue = -1.0;
+
+	switch(option) {
+	case 0:
+		OptionValue = hflip;
+		break;
+	case 1:
+		OptionValue = vflip;
+		break;
+	case 2:
+		OptionValue = minsize;
+		break;
+	case 3:
+		OptionValue = maxsize;
+		break;
+	case 4:
+		OptionValue = peakmode;
+		break;
+#ifdef HAS_FREENECT
+	// MarkerTracker
+	case 5:
+		OptionValue = mt_enabled;
+		break;
+	case 6:
+		OptionValue = mt_showMarker;
+		break;
+#endif
+	default:
+		// leave OptionValue = -1.0
+		break;
+	}
+
+	return OptionValue;
+}
+
+void BlobList::modifyOptionValue(double delta, bool overwrite) {
+	switch(toggle) {
+	case 0: // hflip is a boolean value
+		if(overwrite) {
+			hflip = (delta == 0 ? 0 : (delta == 1 ? 1 : hflip));
+		} else {
+			hflip += delta;
+			hflip = (hflip < 0) ? 0 : (hflip > 1) ? 1 : hflip;
+		}
+		break;
+	case 1: // vflip is a boolean value
+		if(overwrite) {
+			vflip = (delta == 0 ? 0 : (delta == 1 ? 1 : vflip));
+		} else {
+			vflip += delta;
+			vflip = (vflip < 0) ? 0 : (vflip > 1) ? 1 : vflip;
+		}
+		break;
+	case 2:
+		if(overwrite) {
+			minsize = (delta < 0) ? 0 : (delta > MAX_VALUE) ? MAX_VALUE : delta;
+		} else {
+			minsize += delta;
+			minsize = (minsize < 0) ? 0 : (minsize > MAX_VALUE) ? MAX_VALUE : minsize;
+		}
+		break;
+	case 3:
+		if(overwrite) {
+			maxsize = (delta < 0) ? 0 : (delta > MAX_VALUE) ? MAX_VALUE : delta;
+		} else {
+			maxsize += delta;
+			maxsize = (maxsize < 0) ? 0 : (maxsize > MAX_VALUE) ? MAX_VALUE : maxsize;
+		}
+		break;
+	case 4:
+		if(overwrite) {
+			peakmode = (delta < -MAX_VALUE) ? -MAX_VALUE : (delta > MAX_VALUE) ? MAX_VALUE : delta;
+		} else {
+			peakmode += delta;
+			peakmode = (peakmode < -MAX_VALUE) ? -MAX_VALUE : (peakmode > MAX_VALUE) ? MAX_VALUE : peakmode;
+		}
+		break;
+#ifdef HAS_FREENECT
+	// MarkerTracker
+	case 5: // mt_enabled is a boolean value
+		if(overwrite) {
+			mt_enabled = (delta == 0 ? 0 : (delta == 1 ? 1 : mt_enabled));
+		} else {
+			mt_enabled += delta;
+			mt_enabled = (mt_enabled < 0) ? 0 : (mt_enabled > 1) ? 1 : mt_enabled;
+		}
+		break;
+	case 6: // mt_showMarker is a boolean value
+		if(overwrite) {
+			mt_showMarker = (delta == 0 ? 0 : (delta == 1 ? 1 : mt_showMarker));
+		} else {
+			mt_showMarker += delta;
+			mt_showMarker = (mt_showMarker < 0) ? 0 : (mt_showMarker > 1) ? 1 : mt_showMarker;
+		}
+		break;
+	}
+#endif
+}
+
+TiXmlElement* BlobList::getXMLRepresentation() {
+	TiXmlElement* XMLNode = new TiXmlElement( "BlobFilter" );
+	
+	XMLNode->SetAttribute( "IgnoreOrphans", ignore_orphans );
+	XMLNode->SetAttribute( "MinSize",  minsize );
+	XMLNode->SetAttribute( "MaxSize",  maxsize );
+	XMLNode->SetAttribute( "PeakMode", peakmode );
+	XMLNode->SetAttribute( "HFlip", hflip );
+	XMLNode->SetAttribute( "VFlip", vflip );
+	XMLNode->SetAttribute( "Type",  type  );
+	XMLNode->SetAttribute( "TrackRadius", radius );
+	XMLNode->SetAttribute( "PeakFactor", factor );
+
+#ifdef HAS_FREENECT
+	// MarkerTracker
+	XMLNode->SetAttribute( "MarkerTracker", mt_enabled );
+	XMLNode->SetAttribute( "MTshowMarker", mt_showMarker );
+	
+#endif
+
+	return XMLNode;
 }

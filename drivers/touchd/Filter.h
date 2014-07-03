@@ -10,124 +10,293 @@
 #include <tinyxml.h>
 #include <algorithm>
 
-#include <typeinfo>
 #include <fstream>
 
 #include "GLUTWindow.h"
 #include "ShortImage.h"
 #include "IntensityImage.h"
 #include "RGBImage.h"
-
-#include "Option.h"
-
-
-#define FILTER_TYPE_NONE   0x00
-#define FILTER_TYPE_BASIC  0x01
-#define FILTER_TYPE_SHORT  0x02
-#define FILTER_TYPE_GREY   0x03
-#define FILTER_TYPE_RGB    0x04
-#define FILTER_TYPE_ALL    0x07
-
+#include "MarkerTracker.h"
+#include "AquaTopBGGenerator.h"
 
 class Filter {
 
 	public:
 
-		Filter( TiXmlElement* _config = 0, Filter* _input = 0, int _type = FILTER_TYPE_NONE ):
-			shmid(0), input(_input), result(0.0), type(_type), config(_config), image(NULL), shortimage(NULL), rgbimage(NULL)
-		{
+		Filter( TiXmlElement* _config = 0, Filter* _input = 0 ):
+			shmid(0), input(_input), result(0.0), config(_config), image(NULL), shortimage(NULL), rgbimage(NULL)
+		{ 
 			if (config) config->QueryIntAttribute("ShmID",&shmid);
+			// init switching variable for Configurator options
+			toggle = 0;
+			MAX_VALUE = 65535;
+			if(input != 0) {
+				useIntensityImage = input->getUseIntensityImage();
+#ifdef HAS_FREENECT
+				displayRGBImage = input->getdisplayRGBImage();
+#endif
+			}
+		}
 
-			if (!input) return;
+		virtual ~Filter() { delete image; delete shortimage; delete rgbimage; }
 
-			image = input->getImage();
-			if ((type & FILTER_TYPE_BASIC) && image) {
-				int w = image->getWidth();
-				int h = image->getHeight();
+		void checkImage() {
+			if (!image) {
+				IntensityImage* inputimg = input->getImage();
+				int w = inputimg->getWidth();
+				int h = inputimg->getHeight();
 				image = new IntensityImage( w, h, shmid, 1 );
 			}
-
-			shortimage = input->getShortImage();
-			if ((type & FILTER_TYPE_SHORT) && shortimage) {
-				int w = shortimage->getWidth();
-				int h = shortimage->getHeight();
-				shortimage = new ShortImage( w, h, shmid?shmid+1:0, 1 );
+			if (/*TODO: do we have to add this? !useIntensityImage &&*/ !shortimage) {
+				ShortImage* inputimg = input->getShortImage();
+				int w = inputimg->getWidth();
+				int h = inputimg->getHeight();
+				shortimage = new ShortImage( w, h );
 			}
-
-			rgbimage = input->getRGBImage();
-			if ((type & FILTER_TYPE_RGB) && rgbimage) {
-				int w = rgbimage->getWidth();
-				int h = rgbimage->getHeight();
-				rgbimage = new RGBImage( w, h, shmid?shmid+2:0, 1 );
+#ifdef HAS_FREENECT
+			if(!rgbimage) {
+				RGBImage* inputimg = input->getRGBImage();
+				int w = inputimg->getWidth();
+				int h = inputimg->getHeight();
+				rgbimage = new RGBImage( w, h );
 			}
-		}
-
-		void createOption( const std::string _name, double _init, double _min = 0, double _max = __UINT32_MAX__ ) {
-			
-			Option* tmp = new Option( _init, _min, _max );
-			double config_val = _init;
-
-			if (config) config->QueryDoubleAttribute( _name, &config_val );
-			tmp->set(config_val);
-
-			options[_name] = tmp;
-		}
-
-		virtual TiXmlElement* getXMLRepresentation() {
-			TiXmlElement* XMLNode = new TiXmlElement( name() );
-			for (OptionList::iterator opt = options.begin(); opt != options.end(); opt++)
-				XMLNode->SetAttribute( opt->first, opt->second->get() );
-			return XMLNode;
-		}
-
-		virtual ~Filter() {
-			delete image;
-			delete shortimage;
-			delete rgbimage;
+#endif
 		}
 
 		virtual int process() = 0;
-		virtual const char* name() const = 0;
-
 		virtual void reset(int initialReset) { }
 		virtual void processMouseButton(int button, int state, int x, int y) { }
 
-		virtual void draw( GLUTWindow* win, int show_image = FILTER_TYPE_BASIC ) {
-
-			switch (show_image) {
-				case FILTER_TYPE_BASIC: 
-				case FILTER_TYPE_SHORT: if (shortimage) { win->show( *shortimage, 0, 0 ); break; }
-				                        if (image)      { win->show( *image,      0, 0 ); break; }
-				case FILTER_TYPE_RGB:   if (rgbimage)   { win->show( *rgbimage,   0, 0 ); break; }
-			}
-
-			glColor4f( 1.0, 0.0, 0.0, 1.0 );
-			win->print( std::string("showing filter: ") + name(), 10, 10 );
+		// TODO: print filter information
+		virtual void draw( GLUTWindow* win ) {
+			if(useIntensityImage)
+				win->show( *image, 0, 0 );
+#ifdef HAS_FREENECT
+			else if( displayRGBImage )
+				win->show( *rgbimage, 0, 0 );
+#endif
+			else
+				win->show( *shortimage, 0, 0 );
 		}
-
-		virtual void link( Filter* _link ) { }
+		virtual void link( Filter* _link   ) { }
 
 		virtual IntensityImage* getImage() { return image; }
 		virtual ShortImage* getShortImage() { return shortimage; }
 		virtual RGBImage* getRGBImage() { return rgbimage; }
 		virtual double getResult() { return result; }
-		virtual Filter* getParent() { return input; }
 
-		OptionList const& getOptions() { return options; }
-
+		// Configurator functions
+		void nextOption() { toggle = (countOfOptions > 0) ? ((toggle + 1) % countOfOptions) : toggle; }
+		int getCurrentOption() { return toggle; }
+		const int getOptionCount() { return countOfOptions; }
+		virtual const char* getOptionName(int option) { return ""; };
+		virtual double getOptionValue(int option) { return -1;};
+		virtual void modifyOptionValue(double delta, bool overwrite) { };
+		int getUseIntensityImage() { return useIntensityImage; };
+		virtual TiXmlElement* getXMLRepresentation() {return new TiXmlElement( "something_went_wrong" );};
+		Filter* getParent() {return input;};
+#ifdef HAS_FREENECT
+		int getdisplayRGBImage() { return displayRGBImage; };
+		void showRGBImage() { displayRGBImage = (displayRGBImage + 1) % 2; };
+#endif
 	protected:
 
 		int shmid;
 		Filter* input;
 		double result;
-		int type;
-
 		TiXmlElement* config;
 		IntensityImage* image;
 		ShortImage* shortimage;
 		RGBImage* rgbimage;
+		int useIntensityImage;
+		// Configurator
+		int displayRGBImage;
+		int toggle; // initialized in basic Filter constructor
+		int MAX_VALUE; // initialized in basic Filter constructor
+		int countOfOptions; // Initialization required in each subfilter class !
+		int resetOnInit;
+};
 
-		OptionList options;
+
+class BGSubFilter: public Filter {
+	public:
+		BGSubFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual ~BGSubFilter();
+		virtual int process();
+		virtual void reset(int initialReset);
+		virtual void link( Filter* _mask );
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual TiXmlElement* getXMLRepresentation();
+		int getBGSubFilterID();
+		TiXmlElement* getXMLofBackground(int BGSubFilterID, std::string pathToSaveBackgroundIMG);
+		void loadFilterOptions(TiXmlElement* OptionSubtree, bool debug);
+		int loadPGMImageFromFile(std::string filename, bool debug);
+	protected:
+		ShortImage* background;
+		Filter* mask;
+		int invert, adaptive, storeBGImg;
+		int BGSubFilterID; 
+
+};
+
+class FlipFilter: public Filter {
+	public:
+		FlipFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		virtual void processMouseButton(int button, int state, int x, int y);
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		// Options
+		int hflip;
+		int vflip;
+};
+
+class ThreshFilter: public Filter {
+	public:
+		ThreshFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		int THRESH_MAX; // 255 if intensity image is used, else 2047
+		// Options
+		int threshold_min;
+		int threshold_max;
+		int forward_values;
+};
+
+class SpeckleFilter: public Filter {
+	public:
+		SpeckleFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		int noiselevel;
+};
+
+class LowpassFilter: public Filter {
+	public:
+		LowpassFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		int mode, range;
+};
+
+class BandpassFilter: public Filter {
+	public:
+		BandpassFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		int inner, outer;
+};
+
+class SplitFilter: public Filter {
+	public:
+		SplitFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		virtual void reset();
+		virtual IntensityImage* getImage();
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		IntensityImage* image2;
+		int incount, outcount;
+};
+
+class AreaFilter: public Filter {
+	public:
+		AreaFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		virtual void reset(int initialReset);
+		virtual void processMouseButton(int button, int state, int x, int y);
+		void generateEdgepoints( std::vector<Point*> cornerpoints );
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual void draw( GLUTWindow* win );
+		virtual TiXmlElement* getXMLRepresentation();
+		int getAreaFilterID();
+		TiXmlElement* getXMLofAreas(int AreaFilterID);
+		void loadFilterOptions(TiXmlElement* OptionSubtree, bool debug);
+		int createFilterAreaFromConfig(TiXmlElement* PolygonsOfAreaFilter, bool debug);
+	protected:
+		int enabled;
+		int AreaFilterID;
+		bool updated;
+		std::vector<int> edgepoints;
+		std::vector<std::vector<Point*> > cornerpointvector;
+		 
+};
+
+#ifdef HAS_FREENECT
+class MarkerTrackerFilter: public Filter {
+	public:
+		MarkerTrackerFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual int process();
+		virtual void draw( GLUTWindow* win );
+		virtual ~MarkerTrackerFilter();
+
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		// variables to read from XML
+		int int_mt_enabled;
+		int int_mt_showMarker;
+		
+		// variables for further use
+		bool mt_enabled;
+		bool mt_showMarker;
+		MarkerTracker* mMarkerTracker;
+		std::vector<Ubitrack::Vision::SimpleMarkerInfo>* detectedMarkers;
+
+};
+#endif // HAS_FREENECT
+
+class AquaTopBGGenFilter: public Filter {
+	public:
+		AquaTopBGGenFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
+		virtual ~AquaTopBGGenFilter();
+		virtual int process();
+		virtual void reset(int initialReset);
+		virtual void link( Filter* _mask );
+		// Configurator
+		virtual const char* getOptionName(int option);
+		virtual double getOptionValue(int option);
+		virtual void modifyOptionValue(double delta, bool overwrite);
+		virtual TiXmlElement* getXMLRepresentation();
+	protected:
+		ShortImage* background;
+		Filter* mask;
+		int invert, adaptive;
+		AquaTopBGGenerator* bggenerator;
 };
 
 #endif // _FILTER_H_

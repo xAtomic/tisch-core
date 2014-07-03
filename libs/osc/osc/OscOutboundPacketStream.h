@@ -1,8 +1,8 @@
 /*
-	oscpack -- Open Sound Control (OSC) packet manipulation library
-    http://www.rossbencina.com/code/oscpack
+	oscpack -- Open Sound Control packet manipulation library
+	http://www.audiomulch.com/~rossb/oscpack
 
-    Copyright (c) 2004-2013 Ross Bencina <rossb@audiomulch.com>
+	Copyright (c) 2004-2005 Ross Bencina <rossb@audiomulch.com>
 
 	Permission is hereby granted, free of charge, to any person obtaining
 	a copy of this software and associated documentation files
@@ -15,6 +15,10 @@
 	The above copyright notice and this permission notice shall be
 	included in all copies or substantial portions of the Software.
 
+	Any person wishing to distribute modifications to the Software is
+	requested to send the modifications to the original developer so that
+	they can be incorporated into the canonical version.
+
 	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 	EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 	MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -23,21 +27,8 @@
 	CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 	WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-
-/*
-	The text above constitutes the entire oscpack license; however, 
-	the oscpack developer(s) also make the following non-binding requests:
-
-	Any person wishing to distribute modifications to the Software is
-	requested to send the modifications to the original developer so that
-	they can be incorporated into the canonical version. It is also 
-	requested that these non-binding requests be included whenever the
-	above license is reproduced.
-*/
-#ifndef INCLUDED_OSCPACK_OSCOUTBOUNDPACKETSTREAM_H
-#define INCLUDED_OSCPACK_OSCOUTBOUNDPACKETSTREAM_H
-
-#include <cstring> // size_t
+#ifndef INCLUDED_OSCOUTBOUNDPACKET_H
+#define INCLUDED_OSCOUTBOUNDPACKET_H
 
 #include "OscTypes.h"
 #include "OscException.h"
@@ -75,15 +66,15 @@ public:
 
 class OutboundPacketStream{
 public:
-	OutboundPacketStream( char *buffer, std::size_t capacity );
+	OutboundPacketStream( char *buffer, unsigned long capacity );
 	~OutboundPacketStream();
 
     void Clear();
 
-    std::size_t Capacity() const;
+    unsigned int Capacity() const;
 
     // invariant: size() is valid even while building a message.
-    std::size_t Size() const;
+    unsigned int Size() const;
 
     const char *Data() const;
 
@@ -105,7 +96,7 @@ public:
     OutboundPacketStream& operator<<( const InfinitumType& rhs );
     OutboundPacketStream& operator<<( int32 rhs );
 
-#if !(defined(__x86_64__) || defined(_M_X64))
+#ifndef __x86_64__
     OutboundPacketStream& operator<<( int rhs )
             { *this << (int32)rhs; return *this; }
 #endif
@@ -121,9 +112,6 @@ public:
     OutboundPacketStream& operator<<( const Symbol& rhs );
     OutboundPacketStream& operator<<( const Blob& rhs );
 
-    OutboundPacketStream& operator<<( const ArrayInitiator& rhs );
-    OutboundPacketStream& operator<<( const ArrayTerminator& rhs );
-
 private:
 
     char *BeginElement( char *beginPtr );
@@ -132,7 +120,7 @@ private:
     bool ElementSizeSlotRequired() const;
     void CheckForAvailableBundleSpace();
     void CheckForAvailableMessageSpace( const char *addressPattern );
-    void CheckForAvailableArgumentSpace( std::size_t argumentLength );
+    void CheckForAvailableArgumentSpace( long argumentLength );
 
     char *data_;
     char *end_;
@@ -151,4 +139,4 @@ private:
 
 } // namespace osc
 
-#endif /* INCLUDED_OSCPACK_OSCOUTBOUNDPACKETSTREAM_H */
+#endif /* INCLUDED_OSC_OUTBOUND_PACKET_H */

@@ -12,7 +12,7 @@
 unsigned short ShortImage::getPixel(int x, int y) const { return ((unsigned short*)data)[(y*width)+x]; }
 void ShortImage::setPixel(int x, int y, unsigned short value) { ((unsigned short*)data)[(y*width)+x] = value; }
 
-ShortImage::ShortImage( int w, int h, key_t key, unsigned long long int flags ): Image( w, h, sizeof(unsigned short), key, flags ) { sdata = (unsigned short*)data; }
+ShortImage::ShortImage( int w, int h ): Image( w, h, sizeof(unsigned short) ) { sdata = (unsigned short*)data; }
 ShortImage::ShortImage( const ShortImage& img ): Image( img ) { sdata = (unsigned short*)data; }
 
 ShortImage::ShortImage( const IntensityImage& img ):
@@ -21,14 +21,6 @@ ShortImage::ShortImage( const IntensityImage& img ):
 	sdata = (unsigned short*)data;
 	unsigned char* imgdata = img.getData();
 	for (int i = 0; i < count; i++) sdata[i] = imgdata[i] << 8;
-}
-
-ShortImage::ShortImage( const char* filename ) {
-	Image::load( filename, "P5", 2 );
-}
-
-void ShortImage::save( const char* path ) {
-	Image::save( path, "P5" );
 }
 
 
@@ -151,7 +143,7 @@ void ShortImage::undistort( Vector scale, Vector delta, double coeff[5], ShortIm
 	}
 }
 
-int ShortImage::threshold( unsigned short value, ShortImage& target , unsigned short minvalue ) const {
+int ShortImage::threshold( unsigned short value, ShortImage& target , unsigned short minvalue, int forward_values ) const {
 //	#ifndef NOMMX
 	//	mmxthreshold( data, target.data, size, value, minvalue );
 //		return 0;
@@ -159,7 +151,7 @@ int ShortImage::threshold( unsigned short value, ShortImage& target , unsigned s
 		unsigned short tmp;
 		int hits = 0;
 		for (int i = 0; i < count; i++) {
-			tmp = ((sdata[i] > value) && (sdata[i] <= minvalue)) ? 65535 : 0;
+			tmp = ((sdata[i] > value) && (sdata[i] <= minvalue)) ? (forward_values == 1) ? sdata[i] : 65535 : 0;
 			if (tmp) hits++;
 			target.sdata[i] = tmp;
 		}

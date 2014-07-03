@@ -15,6 +15,10 @@
 	#include "FFMVImageSource.h"
 #endif
 
+#ifdef USE_BIGTOUCH
+	#include "ledtouch/FlatSensorImageSource.h"
+#endif
+
 #ifdef __linux
 	#include "V4LImageSource.h"
 #endif
@@ -49,17 +53,21 @@ void dump_plot( int in[], const char* name ) {
 }*/
 
 
-Camera::Camera( TiXmlElement* _config, Filter* _input ):
-	Filter( _config, _input, FILTER_TYPE_ALL )
-{
+Camera::Camera( TiXmlElement* _config, Filter* _input ): Filter( _config, _input ) {
+
 	// generic low-end default settings
 	width = 640; height = 480; fps = 30;
 	sourcepath = "/dev/video0";
+	useIntensityImage = 1;
 	flashmode = 0;
 	flashpath = "/";
 	gain = 0;
 	expo = 0;
 	bright = 0;
+
+	displayRGBImage = 0;
+	// setting variables for Configurator
+	countOfOptions = 0; // quantity of variables that can be manipulated
 
 	#ifdef __linux
 		sourcetype = CAMERA_TYPE_V4L;
@@ -72,6 +80,7 @@ Camera::Camera( TiXmlElement* _config, Filter* _input ):
 	// try to read settings from XML
 	config->QueryIntAttribute   ( "SourceType", &sourcetype );
 	config->QueryStringAttribute( "SourcePath", &sourcepath );
+	config->QueryIntAttribute	( "UseIntensityImage", &useIntensityImage );
 
 	config->QueryIntAttribute   ( "FlashMode",  &flashmode );
 	config->QueryStringAttribute( "FlashPath",  &flashpath );
@@ -86,40 +95,45 @@ Camera::Camera( TiXmlElement* _config, Filter* _input ):
 
 	config->QueryIntAttribute( "Verbose", &verbose );
 
+	// create image buffer see Filter.h
+	image		= new IntensityImage( width, height, shmid, 1 );
+	shortimage	= new ShortImage( width, height );
+	rgbimage	= new RGBImage( width, height );
+	
 	#ifdef HAS_DIRECTSHOW
-		if (sourcetype == CAMERA_TYPE_DIRECTSHOW) {
+		if (sourcetype == CAMERA_TYPE_DIRECTSHOW) 
 			cam = new DirectShowImageSource( width, height, sourcepath.c_str(), verbose );
-			image = new IntensityImage( width, height, shmid, 1 );
-		} else
+		else
 	#endif
 
 	#ifdef HAS_FLYCAPTURE
-		if (sourcetype == CAMERA_TYPE_FFMV) {
+		if (sourcetype == CAMERA_TYPE_FFMV) 
 			cam = new FFMVImageSource( width, height, sourcepath.c_str(), verbose );
-			image = new IntensityImage( width, height, shmid, 1 );
-		} else
+		else
 	#endif
 
 	#ifdef __linux
-		if (sourcetype == CAMERA_TYPE_V4L) {
+		if (sourcetype == CAMERA_TYPE_V4L) 
 			cam = new V4LImageSource( sourcepath, width, height, fps, verbose );
-			image = new IntensityImage( width, height, shmid, 1 );
-		} else
+		else
+	#endif
+
+	#ifdef USE_BIGTOUCH
+		if (sourcetype == CAMERA_TYPE_BIGTOUCH)
+			cam = new FlatSensorImageSource( width, height, "bigtouch.bin", false ); // true );
+		else
 	#endif
 
 	#ifdef HAS_FREENECT
-		if (sourcetype == CAMERA_TYPE_KINECT) {
+		if (sourcetype == CAMERA_TYPE_KINECT) 
 			cam = new KinectImageSource( );
-			shortimage = new ShortImage( width, height, shmid?shmid+1:0, 1 );
-			rgbimage   = new RGBImage  ( width, height, shmid?shmid+2:0, 1 );
-		} else
+		else
 	#endif
 
 	#ifdef HAS_DC1394
 		if (sourcetype == CAMERA_TYPE_DC1394) {
 
 			DCImageSource* dccam = new DCImageSource( width, height, fps, 0, verbose );
-			image = new IntensityImage( width, height, shmid, 1 );
 			cam = dccam;
 
 			// switch GPIO0-3 to output
@@ -201,16 +215,18 @@ int Camera::process() {
 	if (!res) cam->acquire();
 
 	// retrieve image, release buffer and return
-	if (image)      cam->getImage( *image );
-	if (shortimage) cam->getImage( *shortimage );
-	if (rgbimage)   cam->getImage( *rgbimage );
-
+	if(useIntensityImage) cam->getImage( *image );
+#ifdef HAS_FREENECT
+	else {
+		((KinectImageSource*)cam)->getImage( *shortimage ); // depth image
+		((KinectImageSource*)cam)->getImage( *rgbimage ); // rgb image
+	}
+#endif
 	cam->release();
 
 	return 0;
 }
 
-// TODO: clean this up somehow
 void Camera::tilt_kinect( int angle ) {
 #ifdef HAS_FREENECT
 	if( sourcetype == CAMERA_TYPE_KINECT )
@@ -224,6 +240,7 @@ TiXmlElement* Camera::getXMLRepresentation() {
 
 	XMLNode->SetAttribute( "SourceType", sourcetype );
 	XMLNode->SetAttribute( "SourcePath", sourcepath );
+	XMLNode->SetAttribute( "UseIntensityImage", useIntensityImage );
 
 	XMLNode->SetAttribute( "Width", width );
 	XMLNode->SetAttribute( "Height", height );

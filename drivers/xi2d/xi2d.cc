@@ -17,13 +17,13 @@
 #include <string.h>
 
 #include <BasicBlob.h>
-#include <TUIOOutStream.h>
+#include <Socket.h>
 #include <Thread.h>
 #include <tisch.h>
 #include <map>
 
 
-TUIOOutStream output( TISCH_TUIO1 | TISCH_TUIO2 );
+UDPSocket output( INADDR_ANY, 0 );
 
 std::map<int,BasicBlob> blobs;
 int framenum = 0;
@@ -38,8 +38,6 @@ struct OutputThread: public Thread {
 		while (1) {
 
 			lock();
-
-			output.start();
 			
 			// send everything out
 			for (std::map<int,BasicBlob>::iterator blob = blobs.begin(); blob != blobs.end(); blob++) {
@@ -49,22 +47,20 @@ struct OutputThread: public Thread {
 				if (blob->second.value >= 1) {
 					blob->second.id  = blob->first+1;
 					blob->second.pid = 0;
-					blob->second.type = INPUT_TYPE_MOUSE;
-					output << blob->second;
+					output << "shadow " << blob->second << std::endl;
 				}
 
 				if (blob->second.value >= 2) {
 					blob->second.id  = blob->first;
 					blob->second.pid = blob->first+1;
-					blob->second.type = INPUT_TYPE_FINGER;
-					output << blob->second;
+					output << "finger " << blob->second << std::endl;
 				}
 
 			}
 
 			release();
 
-			output.send();
+			output << "frame " << framenum++ << std::endl;
 		
 			usleep( 16666 ); // 60 Hz
 		}
@@ -110,12 +106,8 @@ int main( int argc, char* argv[] ) {
 	XISelectEvents( display, DefaultRootWindow(display), &mask, 1 );
 	free( mask.mask );
 
-	XWindowAttributes attribs;
-	XGetWindowAttributes( display, DefaultRootWindow(display), &attribs );
-	int xdim = attribs.width;
-	int ydim = attribs.height;
-
-	// start UDP thread
+	// set UDP target and start UDP thread
+	output.target( INADDR_LOOPBACK, TISCH_PORT_CALIB );
 	outthr.start();
 
 	while(1) {
@@ -148,8 +140,8 @@ int main( int argc, char* argv[] ) {
 					blobs[xide->deviceid].value = 1;
 					break;
 				case XI_Motion:
-					blobs[xide->deviceid].pos.x = xide->root_x/(double)xdim;
-					blobs[xide->deviceid].pos.y = (ydim - xide->root_y)/(double)ydim;
+					blobs[xide->deviceid].pos.x = xide->root_x;
+					blobs[xide->deviceid].pos.y = 1050-xide->root_y;
 					break;
 				default:
 					std::cout << "Unknown event type " << cookie->evtype << " received." << std::endl;

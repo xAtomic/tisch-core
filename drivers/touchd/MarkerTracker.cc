@@ -86,7 +86,7 @@ void MarkerTracker::findMarker(RGBImage* rgbimage, IntensityImage* image, std::v
 	cvCvtColor(iplConverted, iplDebug, CV_GRAY2RGB);
 	
 	detectedMarkers->clear();
-
+	
     Ubitrack::Vision::findMarkers(iplConverted, *detectedMarkers, *markerList, iplDebug);
 
 #ifdef MT_DEBUG

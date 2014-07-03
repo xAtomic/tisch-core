@@ -63,13 +63,14 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <AdditionalIncludeDirectories>C:\Andi\Uni\libraries\libusb-win32-bin-1.2.6.0\include;C:\Andi\Uni\libraries\PThread\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>libtools.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalDependencies Condition="Exists('$(flycapture)\include\FlyCapture2.h')">FlyCapture2.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalDependencies Condition="Exists('$(freenect)\include\libfreenect.h')">pthreadVC2.lib;freenect.lib;libusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition="Exists('$(freenect)\libfreenect.h')">pthreadVC2.lib;freenect.lib;libusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalDependencies Condition="Exists('$(winsdk)\include\dshow.h')">strmiids.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(flycapture)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Andi\Uni\libraries\libfreenect\vs\lib\Release;C:\Andi\Uni\libraries\PThread\Pre-built.2\lib;C:\Andi\Uni\libraries\libusb-win32-bin-1.2.6.0\lib\msvc;$(flycapture)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
@@ -86,13 +87,14 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalIncludeDirectories>C:\Andi\Uni\libraries\libusb-win32-bin-1.2.6.0\include;C:\Andi\Uni\libraries\PThread\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>libtools.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalDependencies Condition="Exists('$(flycapture)\include\FlyCapture2.h')">FlyCapture2.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalDependencies Condition="Exists('$(freenect)\include\libfreenect.h')">pthreadVC2.lib;freenect.lib;libusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition="Exists('$(freenect)\libfreenect.h')">pthreadVC2.lib;freenect.lib;libusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalDependencies Condition="Exists('$(winsdk)\include\dshow.h')">strmiids.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(flycapture)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Andi\Uni\libraries\libfreenect\vs\lib\Release;C:\Andi\Uni\libraries\PThread\Pre-built.2\lib;C:\Andi\Uni\libraries\libusb-win32-bin-1.2.6.0\lib\msvc;$(flycapture)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -104,7 +106,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\libs\simplecv\Blob.cc" />
     <ClCompile Include="..\libs\simplecv\Circle.cc" />
     <ClCompile Include="..\libs\simplecv\ColorLUT.cc" />
     <ClCompile Include="..\libs\simplecv\IntensityImage.cc" />
@@ -120,7 +121,7 @@
     <ClInclude Include="..\libs\simplecv\FFMVImageSource.h" />
     <ClCompile Include="..\libs\simplecv\FFMVImageSource.cc" />
   </ItemGroup>
-  <ItemGroup Condition="Exists('$(freenect)\include\libfreenect.h')">
+  <ItemGroup Condition="Exists('$(freenect)\libfreenect.h')">
     <ClInclude Include="..\libs\simplecv\KinectImageSource.h" />
     <ClCompile Include="..\libs\simplecv\KinectImageSource.cc" />
   </ItemGroup>
@@ -130,7 +131,6 @@
     <ClCompile Include="..\libs\simplecv\DirectShowImageSource.cc" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\libs\simplecv\Blob.h" />
     <ClInclude Include="..\libs\simplecv\Circle.h" />
     <ClInclude Include="..\libs\simplecv\ColorLUT.h" />
     <ClInclude Include="..\libs\simplecv\Image.h" />

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<libTISCH version="2.0">
+    <Filter>
+        <Camera SourceType="5" SourcePath="/dev/video0" UseIntensityImage="0" Width="640" Height="480" FPS="30" Verbose="0" FlashMode="0" FlashPath="" Gain="0" Exposure="0" Brightness="0">
+            <FlipFilter HFlip="0" VFlip="0">
+                <AreaFilter AreaFilterID="0" Enabled="1">
+                    <ThreshFilter LowerThreshold="1870" UpperThreshold="1924" ForwardValues="1">
+                        <BGSubFilter BGSubFilterID="0" Invert="0" Adaptive="0" storeBGImg="0">
+                            <ThreshFilter LowerThreshold="1" UpperThreshold="8" ForwardValues="0">
+                                <LowpassFilter Mode="2" Range="0">
+                                    <BlobFilter IgnoreOrphans="0" MinSize="21" MaxSize="65535" PeakMode="-1" HFlip="0" VFlip="1" Type="1" TrackRadius="20" PeakFactor="1" MarkerTracker="1" MTshowMarker="0" />
+                                </LowpassFilter>
+                            </ThreshFilter>
+                        </BGSubFilter>
+                    </ThreshFilter>
+                </AreaFilter>
+            </FlipFilter>
+        </Camera>
+    </Filter>
+</libTISCH>

@@ -21,7 +21,7 @@ class TISCH_SHARED RGBImage: public Image {
 	
 	public:
 
-		RGBImage( int w, int h, key_t key = 0, unsigned long long int flags = 0 ): Image( w, h, 3, key, flags ) { }
+		RGBImage(int w, int h): Image(w,h,3) { }
 		RGBImage( const char* path );
 
 		void getChannel(int channel, IntensityImage& target) const;
@@ -38,8 +38,6 @@ class TISCH_SHARED RGBImage: public Image {
 		void undistort( Vector scale, Vector delta, double coeff[5], RGBImage& target ) const; 
 
 };
-
-void TISCH_SHARED rgb2hsv( int r, int g, int b, unsigned char &h, unsigned char &s, unsigned char &v );
 
 std::ostream& operator<<( std::ostream& s, const RGBImage& i );
 

@@ -58,7 +58,7 @@ TUIOOutStream& operator<< ( TUIOOutStream& s, const BasicBlob& b ) {
 		s.osc2 << osc::BeginMessage( "/tuio2/ptr" )
 			<< b.id << b.type << osc::int32(b.assignedMarker.markerID)
 			<< float(b.peak.x) << float(b.peak.y)
-			<< w << float(b.h)
+			<< w << float(1.0)
 			<< osc::EndMessage;
 		
 		if (b.pid)
@@ -73,7 +73,7 @@ TUIOOutStream& operator<< ( TUIOOutStream& s, const BasicBlob& b ) {
 		// /tuio/2Dcur set s x y X Y m
 		s.osc1 << osc::BeginMessage( "/tuio/2Dcur" ) << "set"
 		  << b.id << float(b.pos.x) << float(b.pos.y)
-			<< 0.0f << float(b.h) << float(b.type)
+			<< 0.0f << 0.0f << 0.0f
 			<< osc::EndMessage;
 		// /tuio/2Dblb set s x y a w h f X Y A m r
 		/*s.osc1 << osc::BeginMessage( "/tuio/2Dblb" ) << "set"

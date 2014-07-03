@@ -14,30 +14,22 @@
 
 #include "Filter.h"
 
+using namespace std;
+
 class Configurator {
-
 public:
-
 	Configurator(GLUTWindow* targetWindow, Filter* currentFilter);
 	virtual ~Configurator();
-	
 	void updateCurrentFilter(Filter* currentFilter);
-
 	void showInfo();
 	void showHelp();
 	void showEditInfo();
-
-	void draw();
-	int handleInput( unsigned char c );
+	void showStoreInfo(int mode);
 
 protected:
-
 	GLUTWindow* win;
 	Filter* filter;
 
-	OptionList::const_iterator current;
-	bool helpMode, editMode, visible;
-	std::string userinput;
 };
 
 #endif // _CONFIGURATOR_H_

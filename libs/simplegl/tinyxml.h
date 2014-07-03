@@ -1,6 +1,6 @@
 /*
 www.sourceforge.net/projects/tinyxml
-Original code by Lee Thomason (www.grinninglizard.com)
+Original code (2.0 and earlier )copyright (c) 2000-2006 Lee Thomason (www.grinninglizard.com)
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any
@@ -88,13 +88,12 @@ class TISCH_SHARED TiXmlAttribute;
 class TISCH_SHARED TiXmlText;
 class TISCH_SHARED TiXmlDeclaration;
 class TISCH_SHARED TiXmlParsingData;
-class TISCH_SHARED TiXmlBase;
 class TISCH_SHARED TiXmlNode;
-class TISCH_SHARED TiXmlElement;
+class TISCH_SHARED TiXmlBase;
 
 const int TIXML_MAJOR_VERSION = 2;
 const int TIXML_MINOR_VERSION = 6;
-const int TIXML_PATCH_VERSION = 2;
+const int TIXML_PATCH_VERSION = 1;
 
 /*	Internal structure for tracking location of items 
 	in the XML file.
@@ -149,7 +148,7 @@ public:
 	virtual bool Visit( const TiXmlText& /*text*/ )					{ return true; }
 	/// Visit a comment node
 	virtual bool Visit( const TiXmlComment& /*comment*/ )			{ return true; }
-	/// Visit an unknown node
+	/// Visit an unknow node
 	virtual bool Visit( const TiXmlUnknown& /*unknown*/ )			{ return true; }
 };
 
@@ -681,8 +680,8 @@ public:
 	#endif
 
 	/** Query the type (as an enumerated value, above) of this node.
-		The possible types are: TINYXML_DOCUMENT, TINYXML_ELEMENT, TINYXML_COMMENT,
-								TINYXML_UNKNOWN, TINYXML_TEXT, and TINYXML_DECLARATION.
+		The possible types are: DOCUMENT, ELEMENT, COMMENT,
+								UNKNOWN, TEXT, and DECLARATION.
 	*/
 	int Type() const	{ return type; }
 
@@ -953,7 +952,7 @@ public:
 
 	TiXmlElement( const TiXmlElement& );
 
-	TiXmlElement& operator=( const TiXmlElement& base );
+	void operator=( const TiXmlElement& base );
 
 	virtual ~TiXmlElement();
 
@@ -986,13 +985,6 @@ public:
 		does not exist, then TIXML_NO_ATTRIBUTE is returned.
 	*/	
 	int QueryIntAttribute( const char* name, int* _value ) const;
-	/// QueryUnsignedAttribute examines the attribute - see QueryIntAttribute().
-	int QueryUnsignedAttribute( const char* name, unsigned* _value ) const;
-	/** QueryBoolAttribute examines the attribute - see QueryIntAttribute(). 
-		Note that '1', 'true', or 'yes' are considered true, while '0', 'false'
-		and 'no' are considered false.
-	*/
-	int QueryBoolAttribute( const char* name, bool* _value ) const;
 	/// QueryDoubleAttribute examines the attribute - see QueryIntAttribute().
 	int QueryDoubleAttribute( const char* name, double* _value ) const;
 	/// QueryFloatAttribute examines the attribute - see QueryIntAttribute().
@@ -1172,7 +1164,7 @@ public:
 		SetValue( _value );
 	}
 	TiXmlComment( const TiXmlComment& );
-	TiXmlComment& operator=( const TiXmlComment& base );
+	void operator=( const TiXmlComment& base );
 
 	virtual ~TiXmlComment()	{}
 
@@ -1186,8 +1178,8 @@ public:
 	*/
 	virtual const char* Parse( const char* p, TiXmlParsingData* data, TiXmlEncoding encoding );
 
-	virtual const TiXmlComment*  ToComment() const	{ return this; } ///< Cast to a more defined type. Will return null not of the requested type.
-	virtual		  TiXmlComment*  ToComment()		{ return this; } ///< Cast to a more defined type. Will return null not of the requested type.
+	virtual const TiXmlComment*  ToComment() const { return this; } ///< Cast to a more defined type. Will return null not of the requested type.
+	virtual TiXmlComment*  ToComment() { return this; } ///< Cast to a more defined type. Will return null not of the requested type.
 
 	/** Walk the XML tree visiting this node and all of its children. 
 	*/
@@ -1237,7 +1229,7 @@ public:
 	#endif
 
 	TiXmlText( const TiXmlText& copy ) : TiXmlNode( TiXmlNode::TINYXML_TEXT )	{ copy.CopyTo( this ); }
-	TiXmlText& operator=( const TiXmlText& base )							 	{ base.CopyTo( this ); return *this; }
+	void operator=( const TiXmlText& base )							 	{ base.CopyTo( this ); }
 
 	// Write this text object to a FILE stream.
 	virtual void Print( FILE* cfile, int depth ) const;
@@ -1304,7 +1296,7 @@ public:
 						const char* _standalone );
 
 	TiXmlDeclaration( const TiXmlDeclaration& copy );
-	TiXmlDeclaration& operator=( const TiXmlDeclaration& copy );
+	void operator=( const TiXmlDeclaration& copy );
 
 	virtual ~TiXmlDeclaration()	{}
 
@@ -1361,7 +1353,7 @@ public:
 	virtual ~TiXmlUnknown() {}
 
 	TiXmlUnknown( const TiXmlUnknown& copy ) : TiXmlNode( TiXmlNode::TINYXML_UNKNOWN )		{ copy.CopyTo( this ); }
-	TiXmlUnknown& operator=( const TiXmlUnknown& copy )										{ copy.CopyTo( this ); return *this; }
+	void operator=( const TiXmlUnknown& copy )										{ copy.CopyTo( this ); }
 
 	/// Creates a copy of this Unknown and returns it.
 	virtual TiXmlNode* Clone() const;
@@ -1370,8 +1362,8 @@ public:
 
 	virtual const char* Parse( const char* p, TiXmlParsingData* data, TiXmlEncoding encoding );
 
-	virtual const TiXmlUnknown*     ToUnknown()     const	{ return this; } ///< Cast to a more defined type. Will return null not of the requested type.
-	virtual TiXmlUnknown*           ToUnknown()				{ return this; } ///< Cast to a more defined type. Will return null not of the requested type.
+	virtual const TiXmlUnknown*     ToUnknown()     const { return this; } ///< Cast to a more defined type. Will return null not of the requested type.
+	virtual TiXmlUnknown*           ToUnknown()	    { return this; } ///< Cast to a more defined type. Will return null not of the requested type.
 
 	/** Walk the XML tree visiting this node and all of its children. 
 	*/
@@ -1407,7 +1399,7 @@ public:
 	#endif
 
 	TiXmlDocument( const TiXmlDocument& copy );
-	TiXmlDocument& operator=( const TiXmlDocument& copy );
+	void operator=( const TiXmlDocument& copy );
 
 	virtual ~TiXmlDocument() {}
 
@@ -1645,7 +1637,7 @@ public:
 	TiXmlHandle( TiXmlNode* _node )					{ this->node = _node; }
 	/// Copy constructor
 	TiXmlHandle( const TiXmlHandle& ref )			{ this->node = ref.node; }
-	TiXmlHandle operator=( const TiXmlHandle& ref ) { if ( &ref != this ) this->node = ref.node; return *this; }
+	TiXmlHandle operator=( const TiXmlHandle& ref ) { this->node = ref.node; return *this; }
 
 	/// Return a handle to the first child node.
 	TiXmlHandle FirstChild() const;
@@ -1806,3 +1798,4 @@ private:
 #endif
 
 #endif
+

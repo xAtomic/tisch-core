@@ -7,8 +7,7 @@
 #ifndef _PIPELINE2_H_
 #define _PIPELINE2_H_
 
-#include "AreaFilter.h"
-#include "BGSubFilter.h"
+#include "Filter.h"
 
 
 class Pipeline: public std::vector<Filter*> {
@@ -18,12 +17,14 @@ class Pipeline: public std::vector<Filter*> {
 		 Pipeline( TiXmlElement* _config );
 		~Pipeline();
 
-		void createFilter( TiXmlElement* config, Filter* parent );
+		void createFilter( TiXmlElement* config, Filter* parent, TiXmlElement* optionSubtree );
 
 		int process();
 		void reset(int initialReset);
 
 		// storing configuration
+		std::vector<AreaFilter*> AreaFilterVec;
+		std::vector<BGSubFilter*> BGSubFilterVec;
 		void storeXMLConfig(std::string storingTarget);
 		TiXmlElement* getXMLSubTree(int startIndex, Filter* parentOfRoot);
 

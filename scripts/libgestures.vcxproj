@@ -51,6 +51,8 @@
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Andi\Uni\libraries\PThread\Pre-built.2\lib;C:\Andi\Uni\libraries\libfreenect\vs\lib\Release;C:\Andi\Uni\libraries\libusb-win32-bin-1.2.6.0\lib\msvc;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:\Andi\Uni\libraries\PThread\Pre-built.2\lib;C:\Andi\Uni\libraries\libfreenect\vs\lib\Release;C:\Andi\Uni\libraries\libusb-win32-bin-1.2.6.0\lib\msvc;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -104,6 +106,7 @@
     <ClCompile Include="..\gispl\features\BlobDim.cc" />
     <ClCompile Include="..\gispl\features\BlobGroup.cc" />
     <ClCompile Include="..\gispl\features\BlobID.cc" />
+    <ClCompile Include="..\gispl\features\BlobMarker.cc" />
     <ClCompile Include="..\gispl\features\BlobPos.cc" />
     <ClCompile Include="..\gispl\features\Motion.cc" />
     <ClCompile Include="..\gispl\features\MultiBlobRotation.cc" />
@@ -125,6 +128,7 @@
     <ClInclude Include="..\gispl\features\BlobDim.h" />
     <ClInclude Include="..\gispl\features\BlobGroup.h" />
     <ClInclude Include="..\gispl\features\BlobID.h" />
+    <ClInclude Include="..\gispl\features\BlobMarker.h" />
     <ClInclude Include="..\gispl\features\BlobPos.h" />
     <ClInclude Include="..\gispl\features\Motion.h" />
     <ClInclude Include="..\gispl\features\MultiBlobRotation.h" />
