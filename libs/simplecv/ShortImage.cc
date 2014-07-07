@@ -151,7 +151,7 @@ int ShortImage::threshold( unsigned short value, ShortImage& target , unsigned s
 		unsigned short tmp;
 		int hits = 0;
 		for (int i = 0; i < count; i++) {
-			tmp = ((sdata[i] > value) && (sdata[i] <= minvalue)) ? (forward_values == 1) ? sdata[i] : 65535 : 0;
+			tmp = ((sdata[i] > value) && (sdata[i] <= minvalue)) ? ((forward_values == 1) ? sdata[i] : 65535 ) : 0;
 			if (tmp) hits++;
 			target.sdata[i] = tmp;
 		}

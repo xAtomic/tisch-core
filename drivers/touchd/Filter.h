@@ -17,7 +17,6 @@
 #include "IntensityImage.h"
 #include "RGBImage.h"
 #include "MarkerTracker.h"
-#include "AquaTopBGGenerator.h"
 
 class Filter {
 
@@ -71,12 +70,12 @@ class Filter {
 		virtual void draw( GLUTWindow* win ) {
 			if(useIntensityImage)
 				win->show( *image, 0, 0 );
-#ifdef HAS_FREENECT
-			else if( displayRGBImage )
-				win->show( *rgbimage, 0, 0 );
-#endif
 			else
 				win->show( *shortimage, 0, 0 );
+#ifdef HAS_FREENECT
+			if( displayRGBImage )
+				win->show( *rgbimage, 0, 0 );
+#endif	
 		}
 		virtual void link( Filter* _link   ) { }
 
@@ -279,24 +278,5 @@ class MarkerTrackerFilter: public Filter {
 
 };
 #endif // HAS_FREENECT
-
-class AquaTopBGGenFilter: public Filter {
-	public:
-		AquaTopBGGenFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
-		virtual ~AquaTopBGGenFilter();
-		virtual int process();
-		virtual void reset(int initialReset);
-		virtual void link( Filter* _mask );
-		// Configurator
-		virtual const char* getOptionName(int option);
-		virtual double getOptionValue(int option);
-		virtual void modifyOptionValue(double delta, bool overwrite);
-		virtual TiXmlElement* getXMLRepresentation();
-	protected:
-		ShortImage* background;
-		Filter* mask;
-		int invert, adaptive;
-		AquaTopBGGenerator* bggenerator;
-};
 
 #endif // _FILTER_H_

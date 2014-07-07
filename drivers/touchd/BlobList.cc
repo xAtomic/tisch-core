@@ -123,11 +123,15 @@ int BlobList::process() {
 #endif
 	}
 
+
 	// frame-local blob counter to differentiate between blobs
 	unsigned char value = 254;
 
-	// scan for bright spots
+	
 	unsigned char* data = image->getData();
+	
+	for (int i = 0; i < width*height; i++) if(data[i] != 0) data[i] = 255; //andi: if threshold forward_values is true, this fixes the blob detection
+	// scan for bright spots
 	for (int i = 0; i < width*height; i++) if (data[i] == 255) try {
 
 		// try to create a new blob. throws if blob too small, continues silently.

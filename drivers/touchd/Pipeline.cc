@@ -9,6 +9,8 @@
 #include "BlobList.h"
 #include "Camera.h"
 
+#include "AquaTopBGGenFilter.h"
+
 Pipeline::Pipeline( TiXmlElement* _config ) {
 	// _config = root node of XML
 	TiXmlElement* filterSubtree = _config->FirstChildElement(); // access Filter Node
@@ -51,6 +53,7 @@ void Pipeline::createFilter( TiXmlElement* config, Filter* parent, TiXmlElement*
 	if (type ==  "LowpassFilter") filter = new  LowpassFilter( config, parent );
 	if (type == "BandpassFilter") filter = new BandpassFilter( config, parent );
 	if (type == "MarkerTrackerFilter") filter = new MarkerTrackerFilter( config, parent );
+	if (type == "AquaTopBGGenFilter") filter = new AquaTopBGGenFilter( config, parent );
 
 	if (filter) push_back( filter );
 
