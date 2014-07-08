@@ -29,7 +29,24 @@ class AquaTopBGGenFilter: public Filter {
 		virtual double getOptionValue(int option);
 		virtual void modifyOptionValue(double delta, bool overwrite);
 		virtual TiXmlElement* getXMLRepresentation();
+
 	protected:
+
+		struct Matrix
+		{
+			long double m00;
+			long double m10;
+			long double m20;
+			long double m01;
+			long double m11;
+			long double m21;
+			long double m02;
+			long double m12;
+			long double m22;
+		};
+
+		void GenerateBackground();
+
 		ShortImage* background;
 		ShortImage* maskimage;
 		ShortImage* tmpimage;

@@ -91,7 +91,8 @@ int AquaTopBGGenFilter::process() {
 	for (int i = 0; i < width*height; i++)	if(data[i] == 0) tmpimagedata[i] = 0;
 
 	//copy shortimage to maskimage
-	//*maskimage = *shortimage;
+	*maskimage = *shortimage;
+	unsigned short* maskimagedata = maskimage->getSData();
 
 	paperblobcounter = 0;
 	 //only keep the original values in the area of the blobs which are paper blobs, delete all paper blobs from mask image
@@ -109,6 +110,8 @@ int AquaTopBGGenFilter::process() {
 		if(blobmax - blobmin < paperdepthdiff) //--> paper blob
 		{
 			paperblobcounter++;
+
+			for (int i = 0; i < width*height; i++)	if(data[i] == j) maskimagedata[i] = 0;
 		}
 		else //--> non-paper blob
 		{
@@ -117,14 +120,17 @@ int AquaTopBGGenFilter::process() {
 	}
 
 	
-	// Generate BG for the whole surface (Least-Squares Plane fitting) if at least one paper blob was found
+	// Generate BG for the whole surface (Least-Squares Plane fitting) if at least one paper blob was found. Otherwise don't upgrade background image.
 	if(paperblobcounter > 0)
+	{
+		GenerateBackground();
 		*background = *tmpimage;
+	}
 
 	// BG subtraction
 	*tmpimage = *(input->getShortImage());
 	background->subtract( *tmpimage, *shortimage, invert );
-	//if (adaptive) background->update( *(inputimg), *(maskimage) );
+
 	return 0;
 }
 
@@ -240,42 +246,91 @@ TiXmlElement* AquaTopBGGenFilter::getXMLRepresentation() {
 	return XMLNode;
 }
 
-// Fitting target: lowest sum of squared absolute error
-// Fitting target value = 0.747158511837
-//z = a + by + cx + dxy + f(x^2) + g(x^2)y
-/*double AquaTopBGGenFilter::GetZValue(double x_in, double y_in)
+void AquaTopBGGenFilter::GenerateBackground()
 {
-	double temp;
-	temp = 0.0;
+	unsigned short* tmpimagedata = tmpimage->getSData();
 
-	// coefficients
-	double a = 1.8564803894488152E+03;
-	double b = 5.2563093116817700E-02;
-	double c = 1.2853574330037623E-01;
-	double d = -2.7047119933664614E-04;
-	double f = -1.9683753259302163E-04;
-	double g = 4.7046643987525005E-07;
+	// calculate best fitting plane equation parameters: z = ax + by + c
+	/* http://www.ahinson.com/algorithms_general/Sections/InterpolationRegression/RegressionPlanar.pdf
+		(a,b,c) = m^-1 * v;
+		m = 	sum(x^2)	sum(x*y)	sum(x)
+				sum(x*y)	sum(y^2)	sum(y)
+				sum(x)		sum(y)		n
+		
+		v = ( sum(x*z), sum(y*z), sum(z) )
+	*/
+	// 1) calculate m and v
+	long long int sum_x = 0, sum_y = 0, sum_z = 0, sum_xx = 0, sum_yy = 0, sum_xy = 0, sum_xz = 0, sum_yz = 0;
+	int z;
+	int n = 0;
+	for(int x = 0; x < width; x++)
+	{
+		for(int y = 0; y < height; y++)
+		{
+			if(tmpimagedata[y*width + x] != 0)
+			{
+				z = tmpimagedata[y*width + x];
+				sum_x += x;	sum_y += y;	sum_z += z;	sum_xx += x*x; sum_yy += y*y; sum_xy += x*y; sum_xz += x*z;	sum_yz += y*z; n++;
+			}
+		}
+	}
+	Matrix m = { sum_xx, sum_xy, sum_x, sum_xy, sum_yy, sum_y, sum_x, sum_y, n };
+	::Vector v;
+	v.x = sum_xz; v.y = sum_yz; v.z = sum_z;
 
-	temp += a;
-	temp += b * y_in;
-	temp += c * x_in;
-	temp += d * x_in * y_in;
-	temp += f * pow(x_in, 2.0);
-	temp += g * pow(x_in, 2.0) * y_in;
-	return temp;
+	// 2) calculate m_inv ( inverse of m )
+	/*	http://ardoris.wordpress.com/2008/07/18/general-formula-for-the-inverse-of-a-3x3-matrix/ 
+	formula:
+		m^-1 =	factor *	m11m22-m12m12		m20m12-m10m22		m10m12-m20m11
+							m12m02-m01m22		m00m22-m20m02		m20m01-m00m12
+							m01m12-m11m02		m10m02-m00m12		m00m11-m10m01
+
+		factor = 1 / det = 1 / ( m00(m11m22-m21m12) - m10(m01m22-m21m02) + m20(m01m12-m11m02) )
+	*/
+	double det = m.m00*(m.m11*m.m22-m.m21*m.m12) - m.m10*(m.m01*m.m22-m.m21*m.m02) + m.m20*(m.m01*m.m12-m.m11*m.m02);
+	if(det == 0) return;
+	double factor = 1 / det;
+	Matrix m_inv = { factor, factor, factor, factor, factor, factor, factor, factor, factor };
+	m_inv.m00 *= m.m11*m.m22-m.m12*m.m12;	
+	m_inv.m10 *= (m.m20*m.m12-m.m10*m.m22);		
+	m_inv.m20 *= m.m10*m.m12-m.m20*m.m11;
+	m_inv.m01 *= m.m12*m.m02-m.m01*m.m22;		
+	m_inv.m11 *= m.m00*m.m22-m.m20*m.m02;		
+	m_inv.m21 *= m.m20*m.m01-m.m00*m.m12;
+	m_inv.m02 *= m.m01*m.m12-m.m11*m.m02;		
+	m_inv.m12 *= m.m10*m.m02-m.m00*m.m12;		
+	m_inv.m22 *= m.m00*m.m11-m.m10*m.m01;
+
+	// 3) calculate (a,b,c) = m^-1 * v;
+	::Vector planeparams;
+	planeparams.x = m_inv.m00 * v.x + m_inv.m10 * v.y + m_inv.m20 * v.z;
+	planeparams.y = m_inv.m01 * v.x + m_inv.m11 * v.y + m_inv.m21 * v.z;
+	planeparams.z = m_inv.m02 * v.x + m_inv.m12 * v.y + m_inv.m22 * v.z;
+
+	// generate Background using the plane equation (z = ax + by + c) with calculated planeparams
+	for(int x = 0; x < width; x++)	for(int y = 0; y < height; y++)
+			if(tmpimagedata[y*width + x] == 0)	
+			{tmpimagedata[y*width + x] = planeparams.x * x + planeparams.y * y + planeparams.z;
+	}
 }
 
-//z = a + bx + cy
-double AquaTopBGGenFilter::GetZValueLin(double x_in, double y_in)
-{
-	double temp;
-	temp = 0.0;
-
-	// coefficients
-	double a = 1.8706125660880882E+03;
-	double b = 1.9435859943767713E-02;
-	double c = 1.6705938888233653E-02;
-
-	temp = a + b * x_in + c * y_in;
-	return temp;
-}*/
+	/*
+	debugging...
+	if(paperdepthdiff == 501) 
+	{
+		std::cout << "new frame -------------------------------------------------------------" << std::endl;
+		std::cout << "Matrix m" << std::endl;
+		std::cout << m.m00 << ", " << m.m10 << ", " << m.m20 << std::endl;
+		std::cout << m.m01 << ", " << m.m11 << ", " << m.m21 << std::endl;
+		std::cout << m.m02 << ", " << m.m12 << ", " << m.m22 << std::endl;
+		std::cout << std::endl;
+		std::cout << "Vector v: " << v.x << ", " << v.y << ", " << v.z << std::endl;
+		std::cout << std::endl;
+		std::cout << "det = " << det << " -- factor = " << factor << std::endl;
+		std::cout << std::endl;
+		std::cout << "Matrix m_inv" << std::endl;
+		std::cout << m_inv.m00 << ", " << m_inv.m10 << ", " << m_inv.m20 << std::endl;
+		std::cout << m_inv.m01 << ", " << m_inv.m11 << ", " << m_inv.m21 << std::endl;
+		std::cout << m_inv.m02 << ", " << m_inv.m12 << ", " << m_inv.m22 << std::endl;
+		std::cout << std::endl;
+	}*/
