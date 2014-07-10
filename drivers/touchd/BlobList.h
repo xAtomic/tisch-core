@@ -32,6 +32,9 @@ class BlobList: public Filter {
 
 		void send( TUIOOutStream* tuio );
 
+		virtual void processMouseButton(int button, int state, int x, int y);
+		void addMouseBlobs(unsigned char value);
+
 		// Configurator
 		virtual const char* getOptionName(int option);
 		virtual double getOptionValue(int option);
@@ -63,6 +66,8 @@ class BlobList: public Filter {
 		bool mt_showMarker;
 		MarkerTracker* mMarkerTracker;
 		std::vector<Ubitrack::Vision::SimpleMarkerInfo>* detectedMarkers;
+
+		std::vector<Point*> mouseblobs;
 
 #endif
 		std::vector<Blob>* blobs;

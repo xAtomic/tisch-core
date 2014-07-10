@@ -149,6 +149,8 @@ int BlobList::process() {
 
 	} catch (...) { }
 
+	addMouseBlobs(value);
+
 	// ---------------------------------------------------------------------------
 	// tracking: update IDs from a previous list
 	if (!oldblobs) return 0;
@@ -291,15 +293,16 @@ int BlobList::getID( unsigned char value ) {
 
 // draw the entire list to a window, taking care to minimize GL state switches
 void BlobList::draw( GLUTWindow* win ) {
-#ifdef HAS_FREENECT
-	if( displayRGBImage ) {
-		win->show( *rgbimage, 0, 0 );
-	}
-	else {
-#endif //HAS_FREENECT
+
 		double xoff,yoff,height,size;
 		height = win->getHeight();
 
+#ifdef HAS_FREENECT
+		if( displayRGBImage ) {
+			win->show( *rgbimage, 0, 0 );
+		}
+		else 
+#endif //HAS_FREENECT
 		win->show( *image, 0, 0 );
 
 		glTranslatef(0,0,500); // FIXME: compensate video image default z offset
@@ -352,9 +355,7 @@ void BlobList::draw( GLUTWindow* win ) {
 			tmp << blob->id; if (blob->pid) tmp << "." << blob->pid;
 			win->print( tmp.str(), (int)blob->peak.x, (int)blob->peak.y );
 		}
-#ifdef HAS_FREENECT
-	}
-	
+#ifdef HAS_FREENECT	
 	if( mt_enabled ) {
 		glColor4f( 1.0, 0.0, 0.0, 1.0 );
 		win->print( std::string("makertracker running"), 10, win->getHeight() - 30 );
@@ -432,6 +433,44 @@ void BlobList::send( TUIOOutStream* oscOut ) {
 		}
 		
 		*oscOut << tmp;
+	}
+}
+
+void BlobList::processMouseButton( int button, int state, int x, int y )
+{
+	//add a cornerpoint to the newest polygon
+	if(button == 0 && state == 0)
+	{
+		Point* a = new Point();
+		a->x = x;
+		a->y = y;
+		mouseblobs.push_back(a);
+	}
+
+	//update polygons
+	if(button == 2 && state == 0)
+	{
+		//TODO remove single mouseblob (closest to click)
+		mouseblobs.clear();
+	}
+}
+
+void BlobList::addMouseBlobs(unsigned char value)
+{
+	for(std::vector<Point*>::iterator it = mouseblobs.begin(); it != mouseblobs.end(); it++)
+	{
+		Blob mouseblob(value, gid);
+		value--; gid++;
+
+		if (value == 0) {
+			value = 254;
+			std::cerr << "Warning: too many type " << type << " blobs!" << std::endl;
+		}
+		mouseblob.pos.x = (*it)->x;		mouseblob.pos.y = (*it)->y;
+		mouseblob.peak.x = (*it)->x;	mouseblob.peak.y = (*it)->y;
+		mouseblob.size = 200;
+		mouseblob.type = INPUT_TYPE_FINGER;
+		blobs->push_back(mouseblob);
 	}
 }
 

@@ -42,7 +42,8 @@ void AquaTopBGGenFilter::reset(int initialReset) {
 }
 
 int AquaTopBGGenFilter::process() {
-	
+	rgbimage = input->getRGBImage(); // get pointer from previous filter, do nothing
+
 	// only works for shortimage at this time (kinect uses shortimage)
 	if(useIntensityImage)
 	{
