@@ -28,7 +28,7 @@
 #define MAX_CORR 4 // 8
 #define HOM_CORR 4
 
-int     TARGET_OFFSET = 20;
+int     TARGET_OFFSET = 400;
 #define TARGET_SIZE     40
 
 #define MAX_VARIANCE 0.01

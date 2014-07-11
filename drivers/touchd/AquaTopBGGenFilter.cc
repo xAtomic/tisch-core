@@ -26,6 +26,10 @@ AquaTopBGGenFilter::AquaTopBGGenFilter( TiXmlElement* _config, Filter* _input ):
 	axis1 = (1,0,0);
 	axis2 = (0,1,0);
 	pos = (0,0,0);
+	id = 0;
+
+	tmpblobs = new std::vector<Blob>;
+	paperblobs = new std::vector<Blob>;
 }
 
 AquaTopBGGenFilter::~AquaTopBGGenFilter() {
@@ -42,6 +46,10 @@ void AquaTopBGGenFilter::reset(int initialReset) {
 }
 
 int AquaTopBGGenFilter::process() {
+	// clear lists
+	tmpblobs->clear();
+	paperblobs->clear();
+
 	rgbimage = input->getRGBImage(); // get pointer from previous filter, do nothing
 
 	// only works for shortimage at this time (kinect uses shortimage)
@@ -66,28 +74,28 @@ int AquaTopBGGenFilter::process() {
 
 	// Find the Paper blob(s) in the copy (use IntensityImage->integrate to get pos and size, overwrite values with a certain number) - see example in Bloblist.cc 138 and Blob.cc 24
 	for (int i = 0; i < width*height; i++) if (data[i] == 255) try {
-		// integrate the spot and fill it with the current counter value
-		size = (int)image->integrate( Point(i%width,i/width), pos, axis1, axis2, 255, value );
 
+		tmpblobs->push_back( Blob( image, Point(i%width,i/width), value, id, minsize, maxsize ) );
+/*			// integrate the spot and fill it with the current counter value
+		size = (int)image->integrate( Point(i%width,i/width), pos, axis1, axis2, 255, value );
+		
 		// if the spot is too small or too big, wipe it out and abort
 		if ( (size < minsize) || ((maxsize != 0) && (size > maxsize)) ){
 			image->integrate( Point(i%width,i/width), pos, axis1, axis2, value, 0 );
 			continue;
-		}
+		}*/
+
 		// adjust counter
 		value--;
+		id++;
+
 		// did the frame-local blob counter overflow?
 		if (value == 0) {
 			value = 254;
 			std::cerr << "Warning: too many blobs in AquaTopGenerator!" << std::endl;
 		}
 	} catch (...) { }
-	
-	//TODO temporary workaround. should be: if no paper blob found, just forward image (what if there are several papers? -.-)
-	//if (value == 254)
-		//return 0;
 
-	//std::cout << "end-------------------------------------------------------------"<< std::endl;
 	// use the imagecopy to find all pixels outside of the blobs in the original image and overwrite them with 0
 	for (int i = 0; i < width*height; i++)	if(data[i] == 0) tmpimagedata[i] = 0;
 
@@ -111,15 +119,23 @@ int AquaTopBGGenFilter::process() {
 		if(blobmax - blobmin < paperdepthdiff) //--> paper blob
 		{
 			paperblobcounter++;
-
 			for (int i = 0; i < width*height; i++)	if(data[i] == j) maskimagedata[i] = 0;
+
+			// save the corresponding Blob in tmpblobs to paperblobs list
+			for(std::vector<Blob>::iterator it = tmpblobs->begin(); it != tmpblobs->end(); it++)
+			{
+				if(it->value == j)
+				{
+					paperblobs->push_back(Blob(*it));
+					break;
+				}
+			}
 		}
 		else //--> non-paper blob
 		{
 			for (int i = 0; i < width*height; i++)	if(data[i] == j) tmpimagedata[i] = 0;
 		}
 	}
-
 	
 	// Generate BG for the whole surface (Least-Squares Plane fitting) if at least one paper blob was found. Otherwise don't upgrade background image.
 	if(paperblobcounter > 0)
@@ -133,6 +149,30 @@ int AquaTopBGGenFilter::process() {
 	background->subtract( *tmpimage, *shortimage, invert );
 
 	return 0;
+}
+
+// send blob list via OSC as TUIO 2.0
+void AquaTopBGGenFilter::send( TUIOOutStream* oscOut ) {
+	for (std::vector<Blob>::iterator it = paperblobs->begin(); it != paperblobs->end(); it++) {
+
+		BasicBlob tmp = *it;
+		tmp.type = 100; //paperblobs
+
+		tmp.pos.x  = tmp.pos.x  / (double)width; tmp.pos.y  = tmp.pos.y  / (double)height;
+		tmp.peak.x = tmp.peak.x / (double)width; tmp.peak.y = tmp.peak.y / (double)height;
+
+		/*if (hflip) {
+			tmp.pos.x  = 1.0 - tmp.pos.x;
+			tmp.peak.x = 1.0 - tmp.peak.x;
+		}
+
+		if (vflip) {*/
+			tmp.pos.y  = 1.0 - tmp.pos.y;
+			tmp.peak.y = 1.0 - tmp.peak.y;
+		//}*/
+		
+		*oscOut << tmp;
+	}
 }
 
 const char* AquaTopBGGenFilter::getOptionName(int option) {

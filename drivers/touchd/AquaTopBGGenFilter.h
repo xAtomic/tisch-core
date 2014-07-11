@@ -23,6 +23,7 @@ class AquaTopBGGenFilter: public Filter {
 		AquaTopBGGenFilter( TiXmlElement* _config = 0, Filter* _input = 0 );
 		virtual ~AquaTopBGGenFilter();
 		virtual int process();
+		void send( TUIOOutStream* tuio );
 		virtual void reset(int initialReset);
 		// Configurator
 		virtual const char* getOptionName(int option);
@@ -62,6 +63,11 @@ class AquaTopBGGenFilter: public Filter {
 
 		int paperdepthdiff;
 		int paperblobcounter;
+
+		std::vector<Blob>* paperblobs;
+		std::vector<Blob>* tmpblobs;
+
+		int id;
 };
 
 #endif _AQUATOPBGGENFILTER_H_

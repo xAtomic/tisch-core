@@ -11,6 +11,7 @@
 #include <nanolibc.h>
 #include "Pipeline.h"
 #include "BlobList.h"
+#include "AquaTopBGGenFilter.h"
 #include <GLUTWindow.h>
 #include <TUIOOutStream.h>
 
@@ -275,6 +276,8 @@ void idle() {
 	for (std::vector<Filter*>::iterator filter = mypipe->begin(); filter != mypipe->end(); filter++) {
 		BlobList* bl = dynamic_cast<BlobList*>(*filter);
 		if (bl) bl->send( tuio );
+		AquaTopBGGenFilter* at = dynamic_cast<AquaTopBGGenFilter*>(*filter);
+		if(at) at->send ( tuio );
 	}
 
 	tuio->send();
