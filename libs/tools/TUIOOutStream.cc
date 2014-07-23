@@ -109,3 +109,15 @@ void TUIOOutStream::send() {
 	}
 }
 
+// sends a custom message
+void TUIOOutStream::sendMessage( const char* msg )
+{
+	if (mode & TISCH_TUIO2) {
+		osc2 << osc::BeginMessage( "/tuio2/_msg" ) << msg << osc::EndMessage;
+	}
+
+	if (mode & TISCH_TUIO1) {
+		osc1 << osc::BeginMessage( "/tuio2/_msg" ) << msg << osc::EndMessage;
+	}
+}
+

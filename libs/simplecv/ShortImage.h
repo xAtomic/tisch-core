@@ -32,19 +32,25 @@ class TISCH_SHARED ShortImage: public Image {
 		int intensity() const;
 		void undistort( Vector scale, Vector delta, double coeff[5], ShortImage& target ) const;
 
+		inline int pixelOffset( int x , int y, int channel = 0 ) const { return (y*width)+x; }
 		unsigned short getPixel(int x, int y) const; 
 		void setPixel(int x, int y, unsigned short value);
 
-		 unsigned short* getSData() const { return sdata; }
+		unsigned short* getSData() const { return sdata; }
 
-		 int  threshold( unsigned short value, ShortImage& target , unsigned short minvalue = 65535, int forward_values = 0 ) const;
-		 void despeckle( ShortImage& target, unsigned char threshold = 8 ) const;
-		 void lowpass( ShortImage& target, unsigned char range = 1, unsigned char mode = 0 ) const;
-		 void areamask( ShortImage& target, std::vector<int> edgepoints) const;
+		int  threshold( unsigned short value, ShortImage& target , unsigned short minvalue = 65535, int forward_values = 0 ) const;
+		void despeckle( ShortImage& target, unsigned char threshold = 8 ) const;
+		void lowpass( ShortImage& target, unsigned char range = 1, unsigned char mode = 0 ) const;
+		void areamask( ShortImage& target, std::vector<int> edgepoints) const;
+		void houghLine( ShortImage& target ) const;
+
+		void sobel( ShortImage& target );
+		void sobel();
 
 	private:
 
 		unsigned short* sdata;
+		void sobel( unsigned short* target );
 
 };
 

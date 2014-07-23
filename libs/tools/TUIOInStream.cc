@@ -15,6 +15,7 @@ TUIOInStream::TUIOInStream( int port ):
 
 void TUIOInStream::process_blob( BasicBlob& b ) { }
 void TUIOInStream::process_frame() { }
+void TUIOInStream::process_message( const char* msg ) { }
 
 void TUIOInStream::run() { 
 	retry:
@@ -36,11 +37,16 @@ void TUIOInStream::ReceiverThread::ProcessMessage( const osc::ReceivedMessage& m
 	osc::int32 blobid, unused, parent;
 	float x, y, width, height, angle, area;
 	bool tmp;
+	const char* msg;
 
 	if (std::string(m.AddressPattern()) == "/tuio2/frm") {
 
 		return;
-
+	} else if (std::string(m.AddressPattern()) == "/tuio2/_msg") {
+		
+		args >> msg;
+		stream->process_message(msg);
+		return;
 	} else if (std::string(m.AddressPattern()) == "/tuio2/ptr") {
 
 		// /tuio2/ptr s_id tu_id c_id x_pos y_pos width press [x_vel y_vel m_acc]

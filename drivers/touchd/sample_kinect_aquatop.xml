@@ -4,11 +4,12 @@
         <Camera SourceType="5" SourcePath="/dev/video0" UseIntensityImage="0" Width="640" Height="480" FPS="30" Verbose="0" FlashMode="0" FlashPath="" Gain="0" Exposure="0" Brightness="0">
             <FlipFilter HFlip="0" VFlip="0">
                 <AreaFilter AreaFilterID="0" Enabled="1">
-                    <ThreshFilter LowerThreshold="1870" UpperThreshold="1924" ForwardValues="1">
-                        <AquaTopBGGenFilter Invert="0" Adaptive="0" MinSize="5000" MaxSize="65535" PaperDepthDiff="500">
+                    <ThreshFilter LowerThreshold="1864" UpperThreshold="1924" ForwardValues="1">
+                        <!--BlobFilter IgnoreOrphans="0" MinSize="100" MaxSize="65535" PeakMode="-1" HFlip="0" VFlip="1" Type="1" TrackRadius="20" PeakFactor="1" MarkerTracker="0" MTshowMarker="0" /-->
+                        <AquaTopBGGenFilter Invert="0" Adaptive="0" MinSize="3000" MaxSize="65535" PaperDepthDiff="500" HoughTc="40" HoughTtheta="40" HoughTalpha="3">
                             <ThreshFilter LowerThreshold="2" UpperThreshold="8" ForwardValues="0">
                                 <LowpassFilter Mode="2" Range="0">
-                                    <BlobFilter IgnoreOrphans="0" MinSize="50" MaxSize="400" PeakMode="-1" HFlip="0" VFlip="1" Type="1" TrackRadius="20" PeakFactor="1" MarkerTracker="1" MTshowMarker="0" />
+                                    <BlobFilter IgnoreOrphans="0" MinSize="100" MaxSize="400" PeakMode="-1" HFlip="0" VFlip="1" Type="1" TrackRadius="20" PeakFactor="1" MarkerTracker="0" MTshowMarker="0" />
                                 </LowpassFilter>
                             </ThreshFilter>
                         </AquaTopBGGenFilter>
@@ -20,11 +21,11 @@
     <Option>
         <AreaFilter AreaFilterID="0">
             <Polygon number="0">
-                <Point x="76" y="71" />
-                <Point x="98" y="286" />
-                <Point x="399" y="283" />
-                <Point x="406" y="72" />
-                <Point x="76" y="71" />
+                <Point x="387" y="90" />
+                <Point x="81" y="92" />
+                <Point x="98" y="291" />
+                <Point x="380" y="289" />
+                <Point x="387" y="90" />
             </Polygon>
         </AreaFilter>
     </Option>

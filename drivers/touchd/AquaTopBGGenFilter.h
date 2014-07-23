@@ -63,11 +63,22 @@ class AquaTopBGGenFilter: public Filter {
 
 		int paperdepthdiff;
 		int paperblobcounter;
+		bool hasnonpaperblob;
 
 		std::vector<Blob>* paperblobs;
 		std::vector<Blob>* tmpblobs;
 
 		int id;
+
+		IntensityImage* testimage1;
+		IntensityImage* testimage2;
+		IntensityImage* testimage3;
+		IntensityImage* testimage4;
+		IntensityImage* testimage5;
+
+		int houghTc;
+		int houghTtheta;
+		int houghTalpha;
 };
 
 #endif _AQUATOPBGGENFILTER_H_

@@ -340,7 +340,7 @@ int main( int argc, char* argv[] ) {
 	mypipe = new Pipeline( root );
 	tmp = (*mypipe)[0]; // CameraFilter
 
-	tuio = new TUIOOutStream( TISCH_TUIO1 | TISCH_TUIO2, address, outport );
+	tuio = new TUIOOutStream( /*TISCH_TUIO1 |*/ TISCH_TUIO2, address, outport );
 
 	int width  = tmp->getImage()->getWidth();
 	int height = tmp->getImage()->getHeight();

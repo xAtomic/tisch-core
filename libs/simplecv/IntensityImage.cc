@@ -330,9 +330,9 @@ void IntensityImage::houghLine( IntensityImage& target ) const {
 	
 		tmp = data[ x+y*width ];
 		if (tmp == 0) continue;
-		
+
 		for (j = 0, theta = 0; j < target.width; j++,theta+=dt) {
-			
+
 			rho = x * cosf(theta) + y * sinf(theta);
 			rho = (rho/rf+0.5)*target.height;
 
@@ -380,7 +380,7 @@ void IntensityImage::mask( IntensityImage& target ) {
 }
 	
 void IntensityImage::sobel( unsigned char* target ) {
-	
+
 	int xval,yval,value;
 
 	for (int x = 1; x < width-1; x++) for (int y = 1; y < height-1; y++) {
@@ -394,7 +394,10 @@ void IntensityImage::sobel( unsigned char* target ) {
 				 +   getPixel(x+1,y-1) -   getPixel(x+1,y+1);
 
 		value = (int)sqrt((double)(xval*xval+yval*yval));
-		target[pixelOffset(x,y)] = value/4;
+		value /= 4;
+		value = (value > 255) ? 255 : value;
+		value = (value < 0) ? 255 : value;
+		target[pixelOffset(x,y)] = value;
 	}
 }
 
@@ -713,3 +716,193 @@ void IntensityImage::bandpass( IntensityImage& target, int outer, int inner ) co
 	delete[] tmp;
 }
 
+
+bool IntensityImage::isRectangle( unsigned char value, IntensityImage* t1, IntensityImage* t2, IntensityImage* t3, IntensityImage* t4, IntensityImage* t5, int Tc , int Ttheta, int Talpha, double axisratio) const
+{
+	bool debugcout = false;
+	// copy image
+	//IntensityImage* tmp = new IntensityImage(width, height);
+	*t1 = *this;//*tmp = *this;
+	unsigned char* copieddata = t1->getData();//tmp->getData();
+
+	// create B/W image where value->W (255), !value->B (0)
+	for(int i = 0; i < width * height; i++)
+	{
+		copieddata[i] = (copieddata[i] == value) ? 255 : 0;
+	}
+
+	// sobel
+	//IntensityImage* sobelimage = new IntensityImage(width, height);
+	t1->sobel (*t2);//tmp->sobel( *sobelimage );
+
+	// houghtransformation (use flo's houghline?)
+	t2->houghLine(*t3);//sobelimage->houghLine( *sobelimage );
+
+	t3->butterflyevaluator(*t4, 3, 3);
+
+	// extract local maxima
+	t4->localextrema(*t5,12,10);
+	
+	// search for rectangle in HT image (using algorithm of paper) (accumulated values in HT > Tc, Tc should be axisratio * 255)
+	// find peaks
+	unsigned char* enhancedhoughdata = t5->getData();
+	int houghwidth = t3->getWidth();
+
+	std::vector<int> tmppeaks;
+	for(int i = 0; i < t5->getCount(); i++)	if(enhancedhoughdata[i] != 0) tmppeaks.push_back(i);
+	if(debugcout) std::cout << tmppeaks.size() << " tmppeaks in HT" << std::endl;
+	
+	// store all peaks were houghdata < Tc
+	unsigned char* houghdata = t3->getData();
+	int tc = (int)(0.5*axisratio * 255);
+	std::vector<int> peaks;
+	for(int i = 0; i < tmppeaks.size(); i++) if(houghdata[tmppeaks[i]] > tc) {peaks.push_back(tmppeaks[i]); t2->cross(tmppeaks[i]%houghwidth, (int)(tmppeaks[i]/houghwidth),10,255); if(debugcout) std::cout << tmppeaks[i]%houghwidth << " " << tmppeaks[i]/houghwidth << std::endl; }
+	if(debugcout) std::cout << peaks.size() << " peaks in HT" << std::endl;
+	if(peaks.size() > 6) return false;
+
+	// find pairs with approximately same angle: delta theta = |theta1 - theta2| < Ttheta
+	struct Pair { int p1; int p2; };
+	std::vector<Pair> pairs;
+	for(int i = 0; i < peaks.size() - 1; i++) for(int j = i+1; j < peaks.size(); j++)
+	{
+		int diff = abs(peaks[i]%houghwidth - peaks[j]%houghwidth);
+		diff = (diff > 0.5*houghwidth) ? houghwidth - diff : diff;
+		if( diff < Ttheta && abs(peaks[i]/houghwidth - peaks[j]/houghwidth) > Talpha)
+		{
+			Pair tmppair; tmppair.p1 = peaks[i]; tmppair.p2 = peaks[j];
+			pairs.push_back(tmppair);
+		}
+	}
+
+	if(debugcout) std::cout << pairs.size() << " pairs in HT" << std::endl;
+	if(pairs.size() == 0) return false;
+
+	int counter = 0;
+	// find rectangles: alpha = 0.5 * (theta1 + theta2); delta alpha = ||alpha1 - alpha2| - 90°| < Talpha
+	for(int i = 0; i < pairs.size() - 1; i++) for(int j = i+1; j < pairs.size(); j++)
+	{
+		double pairdist = pairs[i].p1%houghwidth - pairs[j].p1%houghwidth;//abs(0.5*(pairs[i].p1%width + pairs[i].p2%width) - 0.5*(pairs[j].p1%width + pairs[j].p2%width));
+		pairdist = (pairdist > 0.5*houghwidth) ? houghwidth - pairdist : pairdist;
+		double zeroanglediff = abs(pairdist - 0.5*houghwidth);
+		if(zeroanglediff < Tc)
+			counter++;
+	}
+	if(debugcout) std::cout << counter << " rectangles" << std::endl;
+	if(counter == 0) return false;
+	return true;
+}
+
+
+void IntensityImage::butterflyevaluator( unsigned char* target, int w, int h, int targetsize) {
+
+	int value, divisor;
+	int* values= new int[ targetsize ];
+	int max = 0;
+
+	for (int x = w; x < width - w; x++) for (int y = h; y < height - h; y++) {
+
+		value = 0;
+		divisor = 0;
+		for (int i = -w; i < w; i++) for (int j = -h; j < h; j++)
+		{
+			divisor += getPixel(x+i,y+j);
+		}
+		if(divisor == 0) continue;
+		value = (4 * h * w + 2) * getPixel(x,y) * getPixel(x,y);
+		value /= divisor;
+		if (value > max) max = value;
+		values[pixelOffset(x,y)] = value;
+	}
+
+	for (int i = 0; i < size; i++) target[i] = (unsigned char) roundf( ((float)values[i] * 255.0) / (float)max );
+
+	delete[] values;
+}
+
+void IntensityImage::butterflyevaluator( IntensityImage& target, int w, int h ) {
+	butterflyevaluator( target.data , w, h, target.width * target.height);
+}
+
+void IntensityImage::butterflyevaluator( int w, int h ) {
+	// evil pointer shuffling
+	unsigned char* tmp = new unsigned char[size];
+	butterflyevaluator( tmp, w, h, width * height );
+	delete[] data;
+	data = tmp;
+}
+
+void IntensityImage::localextrema( IntensityImage& target, int w, int h) const {
+
+	for(int x = 0; x < target.width; x++) for(int y = 0; y < target.height; y++) target.setPixel(x,y,1);
+
+	unsigned char tmp;
+	bool ismax;
+	int xpos, ypos;
+
+	for (int x = 0; x < width; x++) for (int y = h; y < height - h; y++) 
+	{
+		if(target.getPixel(x,y) == 0) continue;
+		tmp = data[ x+y*width ];
+		if (tmp == 0) continue;
+		ismax = true;
+		for (int i = -w; i < w; i++) for (int j = -h; j < h; j++)
+		{
+			xpos = x+i;
+			//(xpos < 0) ? ypos = height - (y+j) : ypos = (y+j+height)%height;
+			//(xpos > width) ? ypos = height - (y+j) : ypos = (y+j+height)%height;
+			if(xpos < 0 || xpos > width) ypos = height - (y+j);
+			else ypos = y+j;//ypos = (y+j+height)%height;
+
+			if(xpos < 0) xpos += width;
+			else if(xpos >= width) xpos -= width;
+
+			if(tmp < getPixel(xpos,ypos))
+			{
+				target.setPixel(x,y,0);
+				//there is a higher value at xpos,ypos --> start recursive call
+				if(target.getPixel(xpos,ypos) == 1) localextremaRecursive(target,w,h,xpos,ypos);				
+				ismax = false;
+				break;
+			}
+			else
+			{
+				target.setPixel(xpos,ypos,0);
+			}
+		}
+		if(ismax) target.setPixel(x,y,tmp);
+	}
+}
+
+void IntensityImage::localextremaRecursive( IntensityImage& target, int w, int h, int x, int y) const {
+
+	unsigned char tmp;
+	bool ismax;
+	int xpos, ypos;
+
+	tmp = data[ x+y*width ];
+	if (tmp == 0 || target.getPixel(x,y) == 0) return;
+	ismax = true;
+	for (int i = 0; i < w; i++) for (int j = 0; j < h; j++)
+	{
+		xpos = x+i;
+		if(xpos > width) ypos = height - (y+j);
+		else ypos = y+j;
+
+		if(xpos >= width) xpos -= width;
+
+		if(tmp < getPixel(xpos,ypos))
+		{
+			target.setPixel(x,y,0);
+			//there is a higher value at xpos,ypos --> start recursive call
+			if(target.getPixel(xpos,ypos) == 1) localextremaRecursive(target,w,h,xpos,ypos);				
+			ismax = false;
+			break;
+		}
+		else
+		{
+			target.setPixel(xpos,ypos,0);
+		}
+	}
+	if(ismax) target.setPixel(x,y,tmp);
+	
+}

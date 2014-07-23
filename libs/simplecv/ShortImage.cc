@@ -222,3 +222,78 @@ void ShortImage::areamask( ShortImage& target, std::vector<int> edgepoints) cons
 			memcpy((target.sdata +  (*it)), (sdata + (*it)), (*(it+1) - *it)*2); 
 }
 
+void ShortImage::houghLine( ShortImage& target ) const {
+
+	float theta,rho;
+	unsigned short tmp;
+	int x, y, j, offset, res, max = 0;
+
+	int  size = target.width * target.height;
+	int* accu = new int[ size ];
+	for (int i = 0; i < size; i++) accu[i] = 0;
+
+	float dt = M_PI/(float)target.width;
+
+	float rf = 2.0*sqrtf(width*width+height*height);
+
+	for (x = 0; x < width; x++) for (y = 0; y < height; y++) {
+	
+		tmp = sdata[ x+y*width ];
+		if (tmp == 0) continue;
+		
+		for (j = 0, theta = 0; j < target.width; j++,theta+=dt) {
+			
+			rho = x * cosf(theta) + y * sinf(theta);
+			rho = (rho/rf+0.5)*target.height;
+
+			offset = j+target.width*(int)roundf(rho);
+
+			res = accu [ offset ] + 1;
+			if (res > max) max = res;
+			accu [ offset ] = res;
+		}
+	}
+
+	for (int i = 0; i < size; i++) target.sdata[i] = (unsigned short) roundf( ((float)accu[i] * 65535.0) / (float)max );
+
+	delete[] accu;
+}
+
+void ShortImage::sobel( unsigned short* target ) {
+
+	int xval,yval,value;
+
+	for (int x = 1; x < width-1; x++) for (int y = 1; y < height-1; y++) {
+
+		xval =   getPixel(x+1,y-1) -   getPixel(x-1,y-1)
+				 + 2*getPixel(x+1,y  ) - 2*getPixel(x-1,y  )
+				 +   getPixel(x+1,y+1) -   getPixel(x-1,y+1);
+
+		yval =   getPixel(x-1,y-1) -   getPixel(x-1,y+1)
+				 + 2*getPixel(x  ,y-1) - 2*getPixel(x  ,y+1)
+				 +   getPixel(x+1,y-1) -   getPixel(x+1,y+1);
+		
+		xval /= 40;
+		yval /= 40;
+
+		value = (int)sqrt((double)(xval*xval+yval*yval));
+		value *= 100;
+		value = (value > 65535) ? 65535 : value;
+		value = (value < 0) ? 65535 : value;
+		//if (value != 0) std::cout << x << " " << y << " " << value << " " << xval << " " << yval << std::endl;
+		target[pixelOffset(x,y)] = value;
+	}
+}
+
+void ShortImage::sobel( ShortImage& target ) {
+	sobel( target.sdata );
+}
+
+void ShortImage::sobel() {
+	// evil pointer shuffling
+	unsigned short* tmp = new unsigned short[size];
+	sobel( tmp );
+	delete[] sdata;
+	sdata = tmp;
+}
+

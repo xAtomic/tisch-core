@@ -51,6 +51,12 @@ struct CalibTUIOInput: public TUIOInStream {
 		*output << blob;
 	}
 
+	virtual void process_message ( const char* msg )
+	{
+		if (rawlog) (*rawlog) << "msg: " << msg << std::endl;
+		output->sendMessage(msg);
+	}
+
 };
 
 CalibTUIOInput input;
@@ -92,7 +98,7 @@ int main( int argc, char* argv[] ) {
 		          return 0; break;
 	}
 
-	output = new TUIOOutStream( TISCH_TUIO1 | TISCH_TUIO2, address, outport );
+	output = new TUIOOutStream( /*TISCH_TUIO1 |*/ TISCH_TUIO2, address, outport );
 	output->start();
 
 	cal.load();

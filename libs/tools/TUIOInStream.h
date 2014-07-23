@@ -22,6 +22,7 @@ class TISCH_SHARED TUIOInStream {
 
 		virtual void process_blob( BasicBlob& b );
 		virtual void process_frame();
+		virtual void process_message( const char* msg );
 
 		void run();
 		void stop();

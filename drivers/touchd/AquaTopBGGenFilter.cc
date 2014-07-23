@@ -20,16 +20,26 @@ AquaTopBGGenFilter::AquaTopBGGenFilter( TiXmlElement* _config, Filter* _input ):
 	config->QueryIntAttribute( "MinSize",  &minsize  );
 	config->QueryIntAttribute( "MaxSize",  &maxsize  );
 	config->QueryIntAttribute( "PaperDepthDiff",  &paperdepthdiff);
+	config->QueryIntAttribute( "HoughTc",  &houghTc);
+	config->QueryIntAttribute( "HoughTtheta",  &houghTtheta);
+	config->QueryIntAttribute( "HoughTalpha",  &houghTalpha);
 	// setting variables for Configurator
-	countOfOptions = 5; // quantity of variables that can be manipulated
+	countOfOptions = 8; // quantity of variables that can be manipulated
 
 	axis1 = (1,0,0);
 	axis2 = (0,1,0);
 	pos = (0,0,0);
 	id = 0;
+	hasnonpaperblob = false;
 
 	tmpblobs = new std::vector<Blob>;
 	paperblobs = new std::vector<Blob>;
+
+				testimage1 = new IntensityImage(*input->getImage());
+			testimage2 = new IntensityImage(*input->getImage());
+			testimage3 = new IntensityImage(0.25 * testimage2->getWidth(), testimage2->getHeight());
+			testimage4 = new IntensityImage(0.25 * testimage2->getWidth(), testimage2->getHeight());
+			testimage5 = new IntensityImage(0.25 * testimage2->getWidth(), testimage2->getHeight());
 }
 
 AquaTopBGGenFilter::~AquaTopBGGenFilter() {
@@ -46,18 +56,19 @@ void AquaTopBGGenFilter::reset(int initialReset) {
 }
 
 int AquaTopBGGenFilter::process() {
-	// clear lists
-	tmpblobs->clear();
-	paperblobs->clear();
-
 	rgbimage = input->getRGBImage(); // get pointer from previous filter, do nothing
-
+	
 	// only works for shortimage at this time (kinect uses shortimage)
 	if(useIntensityImage)
 	{
 		image = input->getImage();
 		return 0;
 	}
+	
+
+	// clear lists
+	tmpblobs->clear();
+	paperblobs->clear();
 
 	*tmpimage = *(input->getShortImage());
 	unsigned short* tmpimagedata = tmpimage->getSData();
@@ -65,14 +76,14 @@ int AquaTopBGGenFilter::process() {
 	// clone the input image to the IntensityImage
 	tmpimage->convert(*image);
 
-	//"threshold" data of background
+	//convert to B/W image
 	unsigned char* data = image->getData();
 	for (int i = 0; i < width*height; i++) if(data[i] != 0) data[i] = 255;
 	
 	//local blob counter to differentiate blobs
 	unsigned char value = 254;
 
-	// Find the Paper blob(s) in the copy (use IntensityImage->integrate to get pos and size, overwrite values with a certain number) - see example in Bloblist.cc 138 and Blob.cc 24
+	// Find the Paper blob(s) in the copy (uses IntensityImage->integrate to get pos and size, overwrite values with a certain number) - see example in Bloblist.cc 138 and Blob.cc 24
 	for (int i = 0; i < width*height; i++) if (data[i] == 255) try {
 
 		tmpblobs->push_back( Blob( image, Point(i%width,i/width), value, id, minsize, maxsize ) );
@@ -99,14 +110,18 @@ int AquaTopBGGenFilter::process() {
 	// use the imagecopy to find all pixels outside of the blobs in the original image and overwrite them with 0
 	for (int i = 0; i < width*height; i++)	if(data[i] == 0) tmpimagedata[i] = 0;
 
-	//copy shortimage to maskimage
-	*maskimage = *shortimage;
-	unsigned short* maskimagedata = maskimage->getSData();
+																							//copy shortimage to maskimage
+																							//*maskimage = *shortimage;
+																							//unsigned short* maskimagedata = maskimage->getSData();
 
 	paperblobcounter = 0;
-	 //only keep the original values in the area of the blobs which are paper blobs, delete all paper blobs from mask image
+	hasnonpaperblob = false;
+	bool ispaperblob = false;
+
+	 //only keep the original values in the area of the blobs which are paper blobs			// (delete all paper blobs from mask image)
 	for(int j = 254; j > value; j--)
 	{
+		ispaperblob = false;
 		blobmin = 65535; blobmax = 0;
 		for(int i = 0; i < width*height; i++) if(data[i] == j)
 		{
@@ -114,29 +129,43 @@ int AquaTopBGGenFilter::process() {
 			if(blobtmp < blobmin) blobmin = blobtmp;
 			if(blobtmp > blobmax) blobmax = blobtmp;
 		}
-		//std::cout << "blobmin " << blobmin << " blobmax " << blobmax << std::endl;
+		//std::cout << "blobmin " << blobmin << " blobmax " << blobmax << " blobdiff " << blobmax - blobmin<< std::endl;
 		//std::cout << "blobdiff " << blobmax - blobmin << " for value " << static_cast<unsigned>(value) << std::endl;
-		if(blobmax - blobmin < paperdepthdiff) //--> paper blob
-		{
-			paperblobcounter++;
-			for (int i = 0; i < width*height; i++)	if(data[i] == j) maskimagedata[i] = 0;
-
+		if(blobmax - blobmin < paperdepthdiff) //--> potential paper blob
+		{												
 			// save the corresponding Blob in tmpblobs to paperblobs list
 			for(std::vector<Blob>::iterator it = tmpblobs->begin(); it != tmpblobs->end(); it++)
 			{
 				if(it->value == j)
 				{
-					paperblobs->push_back(Blob(*it));
-					break;
+					std::cout << it->size << " =? " << it->axis1.length()*it->axis2.length()*4 << " diff: " << fabs((it->axis1.length() * it->axis2.length() * 4) - it->size) << std::endl;
+					//<< " a1 length: " << it->axis1.length() << " a2 length: " << it->axis2.length() << std::endl;
+					if(fabs((it->axis1.length() * it->axis2.length() * 4) - it->size) < 400) // --> paperblob
+					{
+					// houghtransformation to check if the blob is a rectangle, return true/false, save cornerpoints?
+						if(image->isRectangle(j, testimage1, testimage2, testimage3, testimage4, testimage5, houghTc, houghTtheta, houghTalpha, it->axis2.length() / it->axis1.length()))
+						{
+
+							//for (int i = 0; i < width*height; i++)	if(data[i] == j) maskimagedata[i] = 0;
+						
+							paperblobcounter++;
+							ispaperblob = true;
+							//std::cout << "paperblob" << std::endl;
+							paperblobs->push_back(Blob(*it));
+							break;
+						}
+					}
 				}
 			}
+			
 		}
-		else //--> non-paper blob
+		if(!ispaperblob)//--> non-paper blob
 		{
+			hasnonpaperblob = true;
 			for (int i = 0; i < width*height; i++)	if(data[i] == j) tmpimagedata[i] = 0;
 		}
 	}
-	
+
 	// Generate BG for the whole surface (Least-Squares Plane fitting) if at least one paper blob was found. Otherwise don't upgrade background image.
 	if(paperblobcounter > 0)
 	{
@@ -147,12 +176,21 @@ int AquaTopBGGenFilter::process() {
 	// BG subtraction
 	*tmpimage = *(input->getShortImage());
 	background->subtract( *tmpimage, *shortimage, invert );
+	
+	if(paperdepthdiff == 501) *shortimage = *testimage1;
+	else if(paperdepthdiff == 502) *shortimage = *testimage2;
+	/*else if(paperdepthdiff == 503) *shortimage = *testimage3;
+	else if(paperdepthdiff == 504) *shortimage = *testimage4;
+	else if(paperdepthdiff == 505) *shortimage = *testimage5;*/
 
 	return 0;
 }
 
 // send blob list via OSC as TUIO 2.0
 void AquaTopBGGenFilter::send( TUIOOutStream* oscOut ) {
+	if(!hasnonpaperblob) oscOut->sendMessage("updatePapers");
+	else oscOut->sendMessage("doNotUpdatePapers");
+
 	for (std::vector<Blob>::iterator it = paperblobs->begin(); it != paperblobs->end(); it++) {
 
 		BasicBlob tmp = *it;
@@ -170,7 +208,7 @@ void AquaTopBGGenFilter::send( TUIOOutStream* oscOut ) {
 			tmp.pos.y  = 1.0 - tmp.pos.y;
 			tmp.peak.y = 1.0 - tmp.peak.y;
 		//}*/
-		
+
 		*oscOut << tmp;
 	}
 }
@@ -193,6 +231,15 @@ const char* AquaTopBGGenFilter::getOptionName(int option) {
 		break;
 	case 4:
 		OptionName = "Paper Depth Diff";
+		break;
+	case 5:
+		OptionName = "Hough Tc";
+		break;
+	case 6:
+		OptionName = "Hough Ttheta";
+		break;
+	case 7:
+		OptionName = "Hough Talpha";
 		break;
 	default:
 		// leave OptionName empty
@@ -220,6 +267,15 @@ double AquaTopBGGenFilter::getOptionValue(int option) {
 		break;
 	case 4:
 		OptionValue = paperdepthdiff;
+		break;
+	case 5:
+		OptionValue = houghTc;
+		break;
+	case 6:
+		OptionValue = houghTtheta;
+		break;
+	case 7:
+		OptionValue = houghTalpha;
 		break;
 	default:
 		// leave OptionValue = -1.0
@@ -271,6 +327,30 @@ void AquaTopBGGenFilter::modifyOptionValue(double delta, bool overwrite) {
 			paperdepthdiff = (paperdepthdiff < 0) ? 0 : (paperdepthdiff > MAX_VALUE) ? MAX_VALUE : paperdepthdiff;
 		}
 		break;
+	case 5:
+		if(overwrite) {
+			houghTc = (delta < 0) ? 0 : (delta > 255) ? 255 : delta;
+		} else {
+			houghTc += delta;
+			houghTc = (houghTc < 0) ? 0 : (houghTc > 255) ? 255 : houghTc;
+		}
+		break;
+	case 6:
+		if(overwrite) {
+			houghTtheta = (delta < 0) ? 0 : (delta > width) ? width : delta;
+		} else {
+			houghTtheta += delta;
+			houghTtheta = (houghTtheta < 0) ? 0 : (houghTtheta > width) ? width : houghTtheta;
+		}
+		break;
+	case 7:
+		if(overwrite) {
+			houghTalpha = (delta < 0) ? 0 : (delta > width) ? width : delta;
+		} else {
+			houghTalpha += delta;
+			houghTalpha = (houghTalpha < 0) ? 0 : (houghTalpha > width) ? width : houghTalpha;
+		}
+		break;
 	}
 }
 
@@ -283,6 +363,9 @@ TiXmlElement* AquaTopBGGenFilter::getXMLRepresentation() {
 	XMLNode->SetAttribute( "MinSize",  minsize );
 	XMLNode->SetAttribute( "MaxSize",  maxsize );
 	XMLNode->SetAttribute( "PaperDepthDiff",  paperdepthdiff );
+	XMLNode->SetAttribute( "HoughTc",  houghTc);
+	XMLNode->SetAttribute( "HoughTtheta",  houghTtheta);
+	XMLNode->SetAttribute( "HoughTalpha",  houghTalpha);
 	
 	return XMLNode;
 }

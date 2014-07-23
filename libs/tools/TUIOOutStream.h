@@ -30,6 +30,7 @@ class TISCH_SHARED TUIOOutStream {
 
 		void start();
 		void send();
+		void sendMessage( const char* msg );
 
 	protected:
 

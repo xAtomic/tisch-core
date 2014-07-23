@@ -602,7 +602,7 @@ ThreshFilter::ThreshFilter( TiXmlElement* _config, Filter* _input ): Filter( _co
 int ThreshFilter::process() {
 	rgbimage = input->getRGBImage(); // get pointer from previous filter, do nothing
 	if(useIntensityImage) input->getImage()->threshold( threshold_min, *image, threshold_max );
-	else input->getShortImage()->threshold( threshold_min << 5, *shortimage, threshold_max << 5 , forward_values );
+	else input->getShortImage()->threshold( threshold_min << 5, *shortimage, threshold_max << 5 , forward_values ); 
 	return 0;
 }
 
@@ -760,7 +760,7 @@ LowpassFilter::LowpassFilter( TiXmlElement* _config, Filter* _input ): Filter( _
 int LowpassFilter::process() {
 	rgbimage = input->getRGBImage(); // get pointer from previous filter, do nothing
 	if(useIntensityImage) input->getImage()->lowpass( *image, range, mode );
-	else input->getShortImage()->lowpass( *shortimage, range, mode );
+	else input->getShortImage()->lowpass( *shortimage, range, mode ); // just tested hough and sobel... {input->getShortImage()->sobel(*shortimage); if(mode == 1) shortimage->houghLine(*shortimage); }
 	return 0;
 }
 
