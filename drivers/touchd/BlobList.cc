@@ -130,7 +130,7 @@ int BlobList::process() {
 	
 	unsigned char* data = image->getData();
 	
-	for (int i = 0; i < width*height; i++) if(data[i] != 0) data[i] = 255; //andi: if threshold forward_values is true, this fixes the blob detection
+	for (int i = 0; i < width*height; i++) if(data[i] != 0) data[i] = 255; //andi: if threshold_filter forward_values is true, this fixes the blob detection
 	// scan for bright spots
 	for (int i = 0; i < width*height; i++) if (data[i] == 255) try {
 

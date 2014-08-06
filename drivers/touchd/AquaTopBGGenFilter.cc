@@ -20,9 +20,9 @@ AquaTopBGGenFilter::AquaTopBGGenFilter( TiXmlElement* _config, Filter* _input ):
 	config->QueryIntAttribute( "MinSize",  &minsize  );
 	config->QueryIntAttribute( "MaxSize",  &maxsize  );
 	config->QueryIntAttribute( "PaperDepthDiff",  &paperdepthdiff);
-	config->QueryIntAttribute( "HoughTc",  &houghTc);
+	config->QueryIntAttribute( "HoughTr",  &houghTr);
 	config->QueryIntAttribute( "HoughTtheta",  &houghTtheta);
-	config->QueryIntAttribute( "HoughTalpha",  &houghTalpha);
+	config->QueryIntAttribute( "HoughTanglediff",  &houghTanglediff);
 	// setting variables for Configurator
 	countOfOptions = 8; // quantity of variables that can be manipulated
 
@@ -34,6 +34,7 @@ AquaTopBGGenFilter::AquaTopBGGenFilter( TiXmlElement* _config, Filter* _input ):
 
 	tmpblobs = new std::vector<Blob>;
 	paperblobs = new std::vector<Blob>;
+	papercorners = new std::vector<::Vector>;
 
 				testimage1 = new IntensityImage(*input->getImage());
 			testimage2 = new IntensityImage(*input->getImage());
@@ -69,6 +70,7 @@ int AquaTopBGGenFilter::process() {
 	// clear lists
 	tmpblobs->clear();
 	paperblobs->clear();
+	papercorners->clear();
 
 	*tmpimage = *(input->getShortImage());
 	unsigned short* tmpimagedata = tmpimage->getSData();
@@ -138,12 +140,12 @@ int AquaTopBGGenFilter::process() {
 			{
 				if(it->value == j)
 				{
-					std::cout << it->size << " =? " << it->axis1.length()*it->axis2.length()*4 << " diff: " << fabs((it->axis1.length() * it->axis2.length() * 4) - it->size) << std::endl;
+					//std::cout << it->size << " =? " << it->axis1.length()*it->axis2.length()*4 << " diff: " << fabs((it->axis1.length() * it->axis2.length() * 4) - it->size) << std::endl;
 					//<< " a1 length: " << it->axis1.length() << " a2 length: " << it->axis2.length() << std::endl;
 					if(fabs((it->axis1.length() * it->axis2.length() * 4) - it->size) < 400) // --> paperblob
 					{
-					// houghtransformation to check if the blob is a rectangle, return true/false, save cornerpoints?
-						if(image->isRectangle(j, testimage1, testimage2, testimage3, testimage4, testimage5, houghTc, houghTtheta, houghTalpha, it->axis2.length() / it->axis1.length()))
+						// use houghtransformation to check if the blob is a rectangle, cornerpoints are saved in papercorners if true is returned
+						if(image->isRectangle(j, testimage1, testimage2, testimage3, testimage4, testimage5, houghTr, houghTtheta, houghTanglediff, it->axis2.length() / it->axis1.length(), papercorners))
 						{
 
 							//for (int i = 0; i < width*height; i++)	if(data[i] == j) maskimagedata[i] = 0;
@@ -191,10 +193,19 @@ void AquaTopBGGenFilter::send( TUIOOutStream* oscOut ) {
 	if(!hasnonpaperblob) oscOut->sendMessage("updatePapers");
 	else oscOut->sendMessage("doNotUpdatePapers");
 
+	std::vector<::Vector>::iterator cit = papercorners->begin();
+	std::vector<::Vector>* corners = new std::vector<::Vector>;
+
 	for (std::vector<Blob>::iterator it = paperblobs->begin(); it != paperblobs->end(); it++) {
 
 		BasicBlob tmp = *it;
 		tmp.type = 100; //paperblobs
+
+	/*	std::cout << tmp.pos.x << " " << tmp.pos.y << " paperblob " << tmp.id << std::endl;
+		if(cit != papercorners->end()) { std::cout << cit->x << " " << cit->y << " corner" << std::endl; cit++; }
+		if(cit != papercorners->end()) { std::cout << cit->x << " " << cit->y << " corner" << std::endl; cit++; }
+		if(cit != papercorners->end()) { std::cout << cit->x << " " << cit->y << " corner" << std::endl; cit++; }
+		if(cit != papercorners->end()) { std::cout << cit->x << " " << cit->y << " corner" << std::endl; cit++; }*/
 
 		tmp.pos.x  = tmp.pos.x  / (double)width; tmp.pos.y  = tmp.pos.y  / (double)height;
 		tmp.peak.x = tmp.peak.x / (double)width; tmp.peak.y = tmp.peak.y / (double)height;
@@ -210,6 +221,16 @@ void AquaTopBGGenFilter::send( TUIOOutStream* oscOut ) {
 		//}*/
 
 		*oscOut << tmp;
+
+		corners->clear();
+		if(cit != papercorners->end()) 
+		{ 
+			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
+			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
+			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
+			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
+			oscOut->sendRectangle(tmp.id, *corners);
+		}
 	}
 }
 
@@ -233,13 +254,13 @@ const char* AquaTopBGGenFilter::getOptionName(int option) {
 		OptionName = "Paper Depth Diff";
 		break;
 	case 5:
-		OptionName = "Hough Tc";
+		OptionName = "Hough Tr";
 		break;
 	case 6:
 		OptionName = "Hough Ttheta";
 		break;
 	case 7:
-		OptionName = "Hough Talpha";
+		OptionName = "Hough Tanglediff";
 		break;
 	default:
 		// leave OptionName empty
@@ -269,13 +290,13 @@ double AquaTopBGGenFilter::getOptionValue(int option) {
 		OptionValue = paperdepthdiff;
 		break;
 	case 5:
-		OptionValue = houghTc;
+		OptionValue = houghTr;
 		break;
 	case 6:
 		OptionValue = houghTtheta;
 		break;
 	case 7:
-		OptionValue = houghTalpha;
+		OptionValue = houghTanglediff;
 		break;
 	default:
 		// leave OptionValue = -1.0
@@ -329,10 +350,10 @@ void AquaTopBGGenFilter::modifyOptionValue(double delta, bool overwrite) {
 		break;
 	case 5:
 		if(overwrite) {
-			houghTc = (delta < 0) ? 0 : (delta > 255) ? 255 : delta;
+			houghTr = (delta < 0) ? 0 : (delta > 255) ? 255 : delta;
 		} else {
-			houghTc += delta;
-			houghTc = (houghTc < 0) ? 0 : (houghTc > 255) ? 255 : houghTc;
+			houghTr += delta;
+			houghTr = (houghTr < 0) ? 0 : (houghTr > 255) ? 255 : houghTr;
 		}
 		break;
 	case 6:
@@ -345,10 +366,10 @@ void AquaTopBGGenFilter::modifyOptionValue(double delta, bool overwrite) {
 		break;
 	case 7:
 		if(overwrite) {
-			houghTalpha = (delta < 0) ? 0 : (delta > width) ? width : delta;
+			houghTanglediff = (delta < 0) ? 0 : (delta > width) ? width : delta;
 		} else {
-			houghTalpha += delta;
-			houghTalpha = (houghTalpha < 0) ? 0 : (houghTalpha > width) ? width : houghTalpha;
+			houghTanglediff += delta;
+			houghTanglediff = (houghTanglediff < 0) ? 0 : (houghTanglediff > width) ? width : houghTanglediff;
 		}
 		break;
 	}
@@ -363,9 +384,9 @@ TiXmlElement* AquaTopBGGenFilter::getXMLRepresentation() {
 	XMLNode->SetAttribute( "MinSize",  minsize );
 	XMLNode->SetAttribute( "MaxSize",  maxsize );
 	XMLNode->SetAttribute( "PaperDepthDiff",  paperdepthdiff );
-	XMLNode->SetAttribute( "HoughTc",  houghTc);
+	XMLNode->SetAttribute( "HoughTr",  houghTr);
 	XMLNode->SetAttribute( "HoughTtheta",  houghTtheta);
-	XMLNode->SetAttribute( "HoughTalpha",  houghTalpha);
+	XMLNode->SetAttribute( "HoughTanglediff",  houghTanglediff);
 	
 	return XMLNode;
 }

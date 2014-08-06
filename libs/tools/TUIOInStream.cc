@@ -16,6 +16,7 @@ TUIOInStream::TUIOInStream( int port ):
 void TUIOInStream::process_blob( BasicBlob& b ) { }
 void TUIOInStream::process_frame() { }
 void TUIOInStream::process_message( const char* msg ) { }
+void TUIOInStream::process_rectangle( osc::int32 rectid, std::vector<::Vector> corners ) { }
 
 void TUIOInStream::run() { 
 	retry:
@@ -38,6 +39,8 @@ void TUIOInStream::ReceiverThread::ProcessMessage( const osc::ReceivedMessage& m
 	float x, y, width, height, angle, area;
 	bool tmp;
 	const char* msg;
+	osc::int32 rectid;
+	std::vector<::Vector> corners (4);
 
 	if (std::string(m.AddressPattern()) == "/tuio2/frm") {
 
@@ -46,6 +49,11 @@ void TUIOInStream::ReceiverThread::ProcessMessage( const osc::ReceivedMessage& m
 		
 		args >> msg;
 		stream->process_message(msg);
+		return;
+	} else if (std::string(m.AddressPattern()) == "/tuio2/_rectangle") {
+		args >> rectid;
+		args >> corners[0].x >> corners[0].y >> corners[1].x >> corners[1].y >> corners[2].x >> corners[2].y >> corners[3].x >> corners[3].y; 
+		stream->process_rectangle( rectid, corners );
 		return;
 	} else if (std::string(m.AddressPattern()) == "/tuio2/ptr") {
 

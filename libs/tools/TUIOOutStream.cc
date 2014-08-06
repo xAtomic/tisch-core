@@ -121,3 +121,21 @@ void TUIOOutStream::sendMessage( const char* msg )
 	}
 }
 
+void TUIOOutStream::sendRectangle( osc::int32 rectid, std::vector<::Vector> corners )
+{
+	if (mode & TISCH_TUIO2) {
+		osc2 << osc::BeginMessage( "/tuio2/_rectangle" ) << rectid <<
+			corners[0].x << corners[0].y <<
+			corners[1].x << corners[1].y <<
+			corners[2].x << corners[2].y <<
+			corners[3].x << corners[3].y << osc::EndMessage;
+	}
+
+	if (mode & TISCH_TUIO1) {
+		osc1 << osc::BeginMessage( "/tuio2/_rectangle" ) << rectid <<
+			corners[0].x << corners[0].y <<
+			corners[1].x << corners[1].y <<
+			corners[2].x << corners[2].y <<
+			corners[3].x << corners[3].y << osc::EndMessage;
+	}
+}

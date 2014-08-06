@@ -57,6 +57,14 @@ struct CalibTUIOInput: public TUIOInStream {
 		output->sendMessage(msg);
 	}
 
+	virtual void process_rectangle ( osc::int32 rectid, std::vector<::Vector> corners )
+	{
+		if (rawlog) (*rawlog) << "corners: " << corners << std::endl;
+		cal.apply( corners[0] ); cal.apply( corners[1] ); cal.apply( corners[2] ); cal.apply( corners[3] );
+		if (rawlog) (*rawlog) << "calibrated corners: " << corners << std::endl;
+		output->sendRectangle(rectid, corners);
+	}
+
 };
 
 CalibTUIOInput input;

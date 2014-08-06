@@ -31,6 +31,7 @@ class TISCH_SHARED TUIOOutStream {
 		void start();
 		void send();
 		void sendMessage( const char* msg );
+		void sendRectangle( osc::int32 rectid, std::vector<::Vector> corners );
 
 	protected:
 

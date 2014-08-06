@@ -44,6 +44,8 @@ int angle = 0;
 
 TUIOOutStream* tuio;
 
+int currentfilter = 0;
+
 
 void cleanup( int signal ) {
 
@@ -174,9 +176,34 @@ void keyb( unsigned char c, int, int ) {
 			c = c - '0';
 			if (c < mypipe->size()){
 				tmp = (*mypipe)[c];
+				currentfilter = c;
 				if(configure != 0) {
 					configure->updateCurrentFilter(tmp);
 				}
+			}
+		}
+
+		//next filter
+		if ( c == 'l' )
+		{
+			currentfilter++;
+			if(currentfilter < mypipe->size())
+			{
+				tmp = (*mypipe)[currentfilter];
+				if(configure != 0) configure->updateCurrentFilter(tmp);
+			}
+			else
+				currentfilter--;
+		}
+
+		//previous filter
+		if ( c == 'k' )
+		{
+			if(currentfilter != 0) 
+			{
+				currentfilter--;
+				tmp = (*mypipe)[currentfilter];
+				if(configure != 0) configure->updateCurrentFilter(tmp);
 			}
 		}
 

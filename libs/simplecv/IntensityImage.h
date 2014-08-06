@@ -67,7 +67,7 @@ class TISCH_SHARED IntensityImage: public Image {
 		IntensityImage& operator-=( const IntensityImage& arg );
 		void subtract( const IntensityImage& i1, const IntensityImage& i2 );
 
-		bool isRectangle( unsigned char value, IntensityImage* t1, IntensityImage* t2, IntensityImage* t3, IntensityImage* t4, IntensityImage* t5, int Tc, int Ttheta, int Talpha, double axisratio ) const;
+		bool isRectangle( unsigned char value, IntensityImage* t1, IntensityImage* t2, IntensityImage* t3, IntensityImage* t4, IntensityImage* t5, int Tc, int Ttheta, int Talpha, double axisratio, std::vector<::Vector>* papercorners ) const;
 
 		void butterflyevaluator( IntensityImage& target, int w, int h );
 		void butterflyevaluator(int w, int h);
@@ -94,6 +94,8 @@ class TISCH_SHARED IntensityImage: public Image {
 		void gradient( char* xgrad, char* ygrad );
 
 		void butterflyevaluator( unsigned char* target, int w, int h, int targetsize );
+
+		::Vector calculateCornerPoint( int r1, int r2, double theta1, double theta2 ) const;
 };
 
 std::ostream& operator<<( std::ostream& s, const IntensityImage& i );

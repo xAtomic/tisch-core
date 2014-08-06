@@ -23,6 +23,7 @@ class TISCH_SHARED TUIOInStream {
 		virtual void process_blob( BasicBlob& b );
 		virtual void process_frame();
 		virtual void process_message( const char* msg );
+		virtual void process_rectangle( osc::int32 rectid, std::vector<::Vector> corners );
 
 		void run();
 		void stop();
