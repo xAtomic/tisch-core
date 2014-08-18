@@ -4,7 +4,7 @@
         <Camera SourceType="5" SourcePath="/dev/video0" UseIntensityImage="0" Width="640" Height="480" FPS="30" Verbose="0" FlashMode="0" FlashPath="" Gain="0" Exposure="0" Brightness="0">
             <FlipFilter HFlip="0" VFlip="0">
                 <AreaFilter AreaFilterID="0" Enabled="1">
-                    <ThreshFilter LowerThreshold="1857" UpperThreshold="1924" ForwardValues="1">
+                    <ThreshFilter LowerThreshold="1847" UpperThreshold="1919" ForwardValues="1">
                         <AquaTopBGGenFilter Invert="0" Adaptive="0" MinSize="3000" MaxSize="65535" PaperDepthDiff="500" HoughTr="3" HoughTtheta="40" HoughTanglediff="40">
                             <ThreshFilter LowerThreshold="2" UpperThreshold="8" ForwardValues="0">
                                 <LowpassFilter Mode="2" Range="0">
@@ -17,4 +17,15 @@
             </FlipFilter>
         </Camera>
     </Filter>
+    <Option>
+        <AreaFilter AreaFilterID="0">
+            <Polygon number="0">
+                <Point x="76" y="113" />
+                <Point x="86" y="379" />
+                <Point x="423" y="379" />
+                <Point x="430" y="115" />
+                <Point x="76" y="113" />
+            </Polygon>
+        </AreaFilter>
+    </Option>
 </libTISCH>

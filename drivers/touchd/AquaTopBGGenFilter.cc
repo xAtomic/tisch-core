@@ -38,9 +38,9 @@ AquaTopBGGenFilter::AquaTopBGGenFilter( TiXmlElement* _config, Filter* _input ):
 
 				testimage1 = new IntensityImage(*input->getImage());
 			testimage2 = new IntensityImage(*input->getImage());
-			testimage3 = new IntensityImage(0.25 * testimage2->getWidth(), testimage2->getHeight());
-			testimage4 = new IntensityImage(0.25 * testimage2->getWidth(), testimage2->getHeight());
-			testimage5 = new IntensityImage(0.25 * testimage2->getWidth(), testimage2->getHeight());
+			testimage3 = new IntensityImage(0.15*testimage2->getWidth(), 0.5*testimage2->getHeight());
+			testimage4 = new IntensityImage(0.15*testimage2->getWidth(), 0.5*testimage2->getHeight());
+			testimage5 = new IntensityImage(0.15*testimage2->getWidth(), 0.5*testimage2->getHeight());
 }
 
 AquaTopBGGenFilter::~AquaTopBGGenFilter() {
@@ -149,10 +149,11 @@ int AquaTopBGGenFilter::process() {
 						{
 
 							//for (int i = 0; i < width*height; i++)	if(data[i] == j) maskimagedata[i] = 0;
-						
+							
 							paperblobcounter++;
 							ispaperblob = true;
-							//std::cout << "paperblob" << std::endl;
+							//std::cout << "paperblob??" << std::endl;
+							
 							paperblobs->push_back(Blob(*it));
 							break;
 						}
@@ -225,10 +226,10 @@ void AquaTopBGGenFilter::send( TUIOOutStream* oscOut ) {
 		corners->clear();
 		if(cit != papercorners->end()) 
 		{ 
-			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
-			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
-			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
-			cit->x /= (double) width; cit->y /= (double) height; corners->push_back(*cit); cit++;
+			cit->x /= (double) width; cit->y /= (double) height; cit->y = 1.0 - cit->y; corners->push_back(*cit); cit++;
+			cit->x /= (double) width; cit->y /= (double) height; cit->y = 1.0 - cit->y; corners->push_back(*cit); cit++;
+			cit->x /= (double) width; cit->y /= (double) height; cit->y = 1.0 - cit->y; corners->push_back(*cit); cit++;
+			cit->x /= (double) width; cit->y /= (double) height; cit->y = 1.0 - cit->y; corners->push_back(*cit); cit++;
 			oscOut->sendRectangle(tmp.id, *corners);
 		}
 	}

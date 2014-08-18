@@ -81,7 +81,7 @@ void disp() {
 	while (name && (*name >= '0') && (*name <= '9')) name++;
 
 	glColor4f( 1.0, 0.0, 0.0, 1.0 );
-	win->print( std::string("showing filter: ") + name, 10, 10 );
+	win->print( std::string("showing filter ") + std::to_string((_Longlong)currentfilter) + std::string(": ") + name, 10, 10 );
 
 	// display data of configurator
 	if(configure != 0) {

@@ -326,14 +326,20 @@ void IntensityImage::houghLine( IntensityImage& target ) const {
 
 	float rf = 2.0*sqrtf(width*width+height*height);
 
+	//float cos_t;
+	//float sin_t;
+
 	for (x = 0; x < width; x++) for (y = 0; y < height; y++) {
 	
 		tmp = data[ x+y*width ];
 		if (tmp == 0) continue;
 
 		for (j = 0, theta = 0; j < target.width; j++,theta+=dt) {
-
-			rho = x * cosf(theta) + y * sinf(theta);
+			//cos_t = cosf(theta);
+			//sin_t = sinf(theta);
+			//if(abs(cos_t) < 0.1) {cos_t = 0; sin_t = 1;}
+			//if(abs(sin_t) < 0.1) {cos_t = 1; sin_t = 0;}
+			rho = x * cosf(theta) + y * sinf(theta);//x * cos_t + y * sin_t;//
 			rho = (rho/rf+0.5)*target.height;
 
 			offset = j+target.width*(int)roundf(rho);
@@ -738,10 +744,10 @@ bool IntensityImage::isRectangle( unsigned char value, IntensityImage* t1, Inten
 	// houghtransformation (use flo's houghline?)
 	t2->houghLine(*t3);//sobelimage->houghLine( *sobelimage );
 
-	t3->butterflyevaluator(*t4, 3, 3);
+	t3->butterflyevaluator(*t4, 2, 2);
 
 	// extract local maxima
-	t4->localextrema(*t5,12,10);
+	t4->localextrema(*t5,9,5);
 	
 	// search for rectangle in HT image (using algorithm of paper) (accumulated values in HT > Tc, Tc should be axisratio * 255)
 	// find peaks
@@ -749,12 +755,12 @@ bool IntensityImage::isRectangle( unsigned char value, IntensityImage* t1, Inten
 	int houghwidth = t3->getWidth();
 
 	std::vector<int> tmppeaks;
-	for(int i = 0; i < t5->getCount(); i++)	if(enhancedhoughdata[i] != 0) tmppeaks.push_back(i);
+	for(int i = 0; i < t5->getCount(); i++)	if(enhancedhoughdata[i] != 0) tmppeaks.push_back(i); 
 	if(debugcout) std::cout << tmppeaks.size() << " tmppeaks in HT" << std::endl;
 	
 	// store all peaks were houghdata < Tc
 	unsigned char* houghdata = t3->getData();
-	int Tc = (int)(0.5*axisratio * 255);
+	int Tc = 100;//(int)(0.5*axisratio * 255);
 	std::vector<int> peaks;
 	for(int i = 0; i < tmppeaks.size(); i++) if(houghdata[tmppeaks[i]] > Tc) {peaks.push_back(tmppeaks[i]); t2->cross(tmppeaks[i]%houghwidth, (int)(tmppeaks[i]/houghwidth),10,255); if(debugcout) std::cout << tmppeaks[i]%houghwidth << " " << tmppeaks[i]/houghwidth << std::endl; }
 	if(debugcout) std::cout << peaks.size() << " peaks in HT" << std::endl;
@@ -766,8 +772,10 @@ bool IntensityImage::isRectangle( unsigned char value, IntensityImage* t1, Inten
 	for(int i = 0; i < peaks.size() - 1; i++) for(int j = i+1; j < peaks.size(); j++)
 	{
 		int diff = abs(peaks[i]%houghwidth - peaks[j]%houghwidth);
-		diff = (diff > 0.5*houghwidth) ? houghwidth - diff : diff;
-		if( diff < Ttheta && abs(peaks[i]/houghwidth - peaks[j]/houghwidth) > Tr)
+		//diff = (diff > 0.5*houghwidth) ? houghwidth - diff : diff;
+		int ydiff = abs(peaks[i]/houghwidth - peaks[j]/houghwidth);
+		//if(ydiff > 15) ydiff = abs(peaks[i]/houghwidth - (height - peaks[j]/houghwidth));
+		if( diff < Ttheta &&  ydiff > Tr)
 		{
 			Pair tmppair; tmppair.p1 = peaks[i]; tmppair.p2 = peaks[j];
 			pairs.push_back(tmppair);
@@ -800,19 +808,27 @@ bool IntensityImage::isRectangle( unsigned char value, IntensityImage* t1, Inten
 			r2 = pairs[i].p2 / houghwidth;
 			r3 = pairs[j].p1 / houghwidth;
 			r4 = pairs[j].p2 / houghwidth;
+			//std::cout << r1 << " " << r2 << " " << r3 << " " << r4 << std::endl;
 			theta1 = (pairs[i].p1 % houghwidth) * M_PI / houghwidth;
 			theta2 = (pairs[i].p2 % houghwidth) * M_PI / houghwidth;
 			theta3 = (pairs[j].p1 % houghwidth) * M_PI / houghwidth;
 			theta4 = (pairs[j].p2 % houghwidth) * M_PI / houghwidth;
+			//std::cout<< std::endl;
+			/*::Vector cornerrr = calculateCornerPoint(r1,r3,theta1,theta3);
+			papercorners->push_back(cornerrr);
+			papercorners->push_back(cornerrr);
+			papercorners->push_back(cornerrr);
+			papercorners->push_back(cornerrr);*/
 			papercorners->push_back(calculateCornerPoint(r1,r3,theta1,theta3));
 			papercorners->push_back(calculateCornerPoint(r1,r4,theta1,theta4));
 			papercorners->push_back(calculateCornerPoint(r2,r3,theta2,theta3));
 			papercorners->push_back(calculateCornerPoint(r2,r4,theta2,theta4));
-
+			for(std::vector<::Vector>::iterator it = papercorners->begin(); it != papercorners->end(); it++) t2->cross(it->x, it->y, 20, 255);
 			return true;
 		}
 	}
 	if(debugcout) std::cout << counter << " rectangles" << std::endl;
+	//std::cout << "false" << std::endl;
 	if(counter == 0) return false;
 	return true;
 }
@@ -824,13 +840,19 @@ void IntensityImage::butterflyevaluator( unsigned char* target, int w, int h, in
 	int* values= new int[ targetsize ];
 	int max = 0;
 
-	for (int x = w; x < width - w; x++) for (int y = h; y < height - h; y++) {
+	int tmpx, tmpy;
 
+	//for (int x = w; x < width - w; x++) for (int y = h; y < height - h; y++) {
+	for (int x = 0; x < width; x++) for (int y = h; y < height - h; y++) {
 		value = 0;
 		divisor = 0;
 		for (int i = -w; i < w; i++) for (int j = -h; j < h; j++)
 		{
-			divisor += getPixel(x+i,y+j);
+			tmpx = x+i;
+			tmpy = y+i;
+			if(tmpx < 0) { tmpx = width + tmpx; tmpy = height - tmpy; }
+			else if (tmpx >= width) {tmpx = tmpx - width; tmpy = height - tmpy; }
+			divisor += getPixel(tmpx,tmpy);
 		}
 		if(divisor == 0) continue;
 		value = (4 * h * w + 2) * getPixel(x,y) * getPixel(x,y);
@@ -934,28 +956,30 @@ void IntensityImage::localextremaRecursive( IntensityImage& target, int w, int h
 // r = x * cos(theta) + y * sin(theta)
 ::Vector IntensityImage::calculateCornerPoint( int r1, int r2, double theta1, double theta2 ) const
 {
-	//std::cout << r1 << " " << r2 << " " << theta1 << " " << theta2 << std::endl;
+	//std::cout << r1 << " " << r2 << " " << height << " " << theta1 << " " << theta2 << std::endl;
 	float rf = 2.0*sqrtf(width*width+height*height); //this width and height is from the original image
 
-	r1 = ( (double)r1 /  height - 0.5) * rf; //only works if height of hough-image == height of original image. the height in this calculation should be the height of the hough image
-	r2 = ( (double)r2 /  height - 0.5) * rf; //only works if height of hough-image == height of original image. the height in this calculation should be the height of the hough image
+	r1 = ( (double)r1 /  (0.5*height) - 0.5) * rf; //only works if height of hough-image == height of original image (when using r1 / height - 0.5). the height in this calculation should be the height of the hough image
+	r2 = ( (double)r2 /  (0.5*height) - 0.5) * rf; //only works if height of hough-image == height of original image (when using r2 / height - 0.5). the height in this calculation should be the height of the hough image
 	//std::cout << r1 << " " << r2 << " " << theta1 << " " << theta2 << std::endl;
-	
+
 	double cos_t1 = cos(theta1);
 	double cos_t2 = cos(theta2);
 
 	::Vector point;
 	int x,y;
-
-	if(cos_t1 == 0)
+	x=1;y=1;
+	if(abs(cos_t1) < 0.00001/*< 0.1*/) //theta = 90°, theta2 = 0° oder 180°
 	{
-		y = r1 / sin(theta1);
-		x = (r2 - y * sin(theta2)) / cos(theta2);
+		y = r1; //r1 / sin(theta1);
+		x = abs(r2); //(r2 - y * sin(theta2)) / cos(theta2);
+		//std::cout << "t1  " << x << " " << y << std::endl;
 	}
-	else if (cos_t2 == 0)
+	else if (abs(cos_t2) < 0.00001/*< 0.1*/)//theta2 = 90°, theta1 = 0° oder 180°
 	{
-		y = r2 / sin(theta2);
-		x = (r1 - y * sin(theta1)) / cos(theta1);
+		y = r2; //r2 / sin(theta2);
+		x = abs(r1); //(r1 - y * sin(theta1)) / cos(theta1);
+		//std::cout << "t2  " << x << " " << y << std::endl;
 	}
 	else
 	{
